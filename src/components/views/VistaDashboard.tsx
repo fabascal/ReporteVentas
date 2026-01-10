@@ -1,0 +1,349 @@
+import React, { useMemo } from 'react'
+import { ReporteVentas } from '../../types/reportes'
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'
+
+interface VistaDashboardProps {
+  totalesAcumulados: { premium: number; magna: number; diesel: number }
+  totalesDia: { premium: number; magna: number; diesel: number }
+  totalGeneralAcumulado: number
+  totalGeneralDia: number
+  datosPreciosPorDia: Array<{ dia: string; Premium: number; Magna: number; Diesel: number }>
+  datosLitrosPorZona: Array<{ zona: string; Premium: number; Magna: number; Diesel: number }>
+  datosVentasPorZona: Array<{ zona: string; 'Total Ventas': number }>
+  datosTopEstaciones: Array<{ estacion: string; zona: string; 'Total Ventas': number }>
+  fechaFiltro: string
+  setFechaFiltro: (fecha: string) => void
+  reportesAcumulados: ReporteVentas[]
+  reportesDiaSeleccionado: ReporteVentas[]
+}
+
+const VistaDashboard: React.FC<VistaDashboardProps> = ({
+  totalesAcumulados,
+  totalesDia,
+  totalGeneralAcumulado,
+  totalGeneralDia,
+  datosPreciosPorDia,
+  datosLitrosPorZona,
+  datosVentasPorZona,
+  datosTopEstaciones,
+  fechaFiltro,
+  setFechaFiltro,
+  reportesAcumulados,
+  reportesDiaSeleccionado,
+}) => {
+  // Usar mediodía para evitar problemas de zona horaria
+  const fechaSeleccionada = new Date(fechaFiltro + 'T12:00:00')
+  const nombreMes = fechaSeleccionada.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+  
+  // Calcular el último día del mes que tiene reportes
+  const diaSeleccionado = useMemo(() => {
+    if (reportesAcumulados.length === 0) return 1
+    const dias = reportesAcumulados.map((r) => {
+      if (!r.fecha) return 0
+      const fechaStr = r.fecha.includes('T') ? r.fecha.split('T')[0] : r.fecha
+      const fechaReporte = new Date(fechaStr + 'T00:00:00')
+      return isNaN(fechaReporte.getTime()) ? 0 : fechaReporte.getDate()
+    })
+    return Math.max(...dias.filter(d => d > 0), 1)
+  }, [reportesAcumulados])
+
+  return (
+    <>
+      {/* Page Heading */}
+      <div className="mb-8 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-[#111418] dark:text-white">
+            Dashboard Analítico
+          </h1>
+          <div className="flex items-center gap-2 text-[#617589] dark:text-slate-400">
+            <span className="material-symbols-outlined text-[20px]">analytics</span>
+            <p className="text-base font-normal">Análisis y comparación de ventas por fecha</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label htmlFor="fecha-filtro" className="text-sm font-medium text-[#111418] dark:text-white">
+              Mes:
+            </label>
+            <input
+              id="fecha-filtro"
+              type="month"
+              value={fechaFiltro.substring(0, 7)}
+              onChange={(e) => {
+                const fecha = e.target.value + '-01'
+                setFechaFiltro(fecha)
+              }}
+              className="px-4 py-2 rounded-lg border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+            />
+          </div>
+          <div className="flex items-center gap-2 text-sm text-[#617589] dark:text-slate-400 bg-white dark:bg-[#1a2632] px-4 py-2 rounded-full border border-[#e6e8eb] dark:border-slate-700 shadow-sm">
+            <span className="material-symbols-outlined text-lg">calendar_month</span>
+            <span>
+              Período: <span className="font-semibold text-[#111418] dark:text-white capitalize">{nombreMes}</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Cards - Totales del Mes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm relative overflow-hidden group">
+          <div className="absolute right-0 top-0 h-full w-1 bg-red-500/20 group-hover:bg-red-500 transition-colors"></div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="rounded-lg bg-red-50 dark:bg-red-900/30 p-3 text-red-600 dark:text-red-400">
+              <span className="material-symbols-outlined text-3xl">local_gas_station</span>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Premium</p>
+          <p className="text-2xl font-black text-red-600 dark:text-red-400 tracking-tight">
+            ${totalesAcumulados.premium.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800">
+            <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
+            <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+              Día {diaSeleccionado}: ${totalesDia.premium.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm relative overflow-hidden group">
+          <div className="absolute right-0 top-0 h-full w-1 bg-green-500/20 group-hover:bg-green-500 transition-colors"></div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="rounded-lg bg-green-50 dark:bg-green-900/30 p-3 text-green-600 dark:text-green-400">
+              <span className="material-symbols-outlined text-3xl">local_gas_station</span>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Magna</p>
+          <p className="text-2xl font-black text-green-600 dark:text-green-400 tracking-tight">
+            ${totalesAcumulados.magna.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
+            <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
+            <p className="text-xs font-semibold text-green-600 dark:text-green-400">
+              Día {diaSeleccionado}: ${totalesDia.magna.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm relative overflow-hidden group">
+          <div className="absolute right-0 top-0 h-full w-1 bg-gray-500/20 group-hover:bg-gray-500 transition-colors"></div>
+          <div className="flex items-center justify-between mb-4">
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-900/30 p-3 text-gray-700 dark:text-gray-300">
+              <span className="material-symbols-outlined text-3xl">local_gas_station</span>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Diesel</p>
+          <p className="text-2xl font-black text-gray-700 dark:text-gray-300 tracking-tight">
+            ${totalesAcumulados.diesel.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+            <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              Día {diaSeleccionado}: ${totalesDia.diesel.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border-2 border-[#1173d4] dark:border-[#1173d4] bg-[#1173d4]/5 dark:bg-[#1173d4]/10 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="rounded-lg bg-[#1173d4]/20 dark:bg-[#1173d4]/30 p-3 text-[#1173d4]">
+              <span className="material-symbols-outlined text-3xl">payments</span>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Total General</p>
+          <p className="text-2xl font-black text-[#1173d4] tracking-tight">
+            ${totalGeneralAcumulado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+            <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
+            <p className="text-xs font-semibold text-[#1173d4]">
+              Día {diaSeleccionado}: ${totalGeneralDia.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Gráficas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Gráfica de Precios Promedio por Día */}
+        <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#1173d4]">show_chart</span>
+            Precios Promedio por Día - {nombreMes}
+          </h3>
+          {datosPreciosPorDia.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={datosPreciosPorDia}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e6e8eb" className="dark:stroke-slate-700" />
+                <XAxis dataKey="dia" stroke="#617589" className="dark:stroke-slate-400" />
+                <YAxis stroke="#617589" className="dark:stroke-slate-400" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e6e8eb',
+                    borderRadius: '8px',
+                  }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="Premium" stroke="#ef4444" strokeWidth={2} />
+                <Line type="monotone" dataKey="Magna" stroke="#22c55e" strokeWidth={2} />
+                <Line type="monotone" dataKey="Diesel" stroke="#6b7280" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-[#617589] dark:text-slate-400">
+              <div className="text-center">
+                <span className="material-symbols-outlined text-6xl mb-4">bar_chart</span>
+                <p>No hay datos disponibles para este mes</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Gráfica de Litros Vendidos por Zona */}
+        <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#1173d4]">water_drop</span>
+            Litros Vendidos por Zona - {nombreMes}
+          </h3>
+          {datosLitrosPorZona.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={datosLitrosPorZona}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e6e8eb" className="dark:stroke-slate-700" />
+                <XAxis dataKey="zona" stroke="#617589" className="dark:stroke-slate-400" />
+                <YAxis stroke="#617589" className="dark:stroke-slate-400" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e6e8eb',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number | undefined) => value ? `${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })} L` : '0 L'}
+                />
+                <Legend />
+                <Bar dataKey="Premium" fill="#ef4444" />
+                <Bar dataKey="Magna" fill="#22c55e" />
+                <Bar dataKey="Diesel" fill="#6b7280" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[300px] flex items-center justify-center text-[#617589] dark:text-slate-400">
+              <div className="text-center">
+                <span className="material-symbols-outlined text-6xl mb-4">bar_chart</span>
+                <p>No hay datos disponibles para este mes</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Gráfica de Ventas Totales por Zona */}
+      <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm mb-8">
+        <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[#1173d4]">trending_up</span>
+          Ventas Totales por Zona - {nombreMes}
+        </h3>
+        {datosVentasPorZona.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={datosVentasPorZona}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e6e8eb" className="dark:stroke-slate-700" />
+              <XAxis dataKey="zona" stroke="#617589" className="dark:stroke-slate-400" />
+              <YAxis stroke="#617589" className="dark:stroke-slate-400" />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e6e8eb',
+                  borderRadius: '8px',
+                }}
+                formatter={(value: number | undefined) => value ? `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+              />
+              <Bar dataKey="Total Ventas" fill="#1173d4" />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[300px] flex items-center justify-center text-[#617589] dark:text-slate-400">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-6xl mb-4">bar_chart</span>
+              <p>No hay datos disponibles para este mes</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Gráfica de Top 10 Estaciones */}
+      <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm mb-8">
+        <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[#1173d4]">star</span>
+          Top 10 Estaciones por Ventas - {nombreMes}
+        </h3>
+        {datosTopEstaciones.length > 0 ? (
+          <ResponsiveContainer width="100%" height={400}>
+            <BarChart data={datosTopEstaciones} layout="vertical">
+              <CartesianGrid strokeDasharray="3 3" stroke="#e6e8eb" className="dark:stroke-slate-700" />
+              <XAxis type="number" stroke="#617589" className="dark:stroke-slate-400" />
+              <YAxis dataKey="estacion" type="category" stroke="#617589" className="dark:stroke-slate-400" width={150} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e6e8eb',
+                  borderRadius: '8px',
+                }}
+                formatter={(value: number | undefined) => value ? `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+                labelFormatter={(label) => `Estación: ${label}`}
+              />
+              <Bar dataKey="Total Ventas" fill="#1173d4" />
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[400px] flex items-center justify-center text-[#617589] dark:text-slate-400">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-6xl mb-4">bar_chart</span>
+              <p>No hay datos disponibles para este mes</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Resumen de Reportes del Mes */}
+      <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
+        <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4 flex items-center gap-2">
+          <span className="material-symbols-outlined text-[#1173d4]">description</span>
+          Resumen de Reportes del Mes
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
+            <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Total de Reportes</p>
+            <p className="text-2xl font-black text-[#111418] dark:text-white">{reportesAcumulados.length}</p>
+            <p className="text-xs text-[#617589] dark:text-slate-400 mt-1">Día {diaSeleccionado}: {reportesDiaSeleccionado.length}</p>
+          </div>
+          <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
+            <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Estaciones Activas</p>
+            <p className="text-2xl font-black text-[#111418] dark:text-white">
+              {new Set(reportesAcumulados.map((r) => r.estacionNombre)).size}
+            </p>
+          </div>
+          <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
+            <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Promedio por Reporte</p>
+            <p className="text-2xl font-black text-[#111418] dark:text-white">
+              ${reportesAcumulados.length > 0 ? (totalGeneralAcumulado / reportesAcumulados.length).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+export default VistaDashboard
+

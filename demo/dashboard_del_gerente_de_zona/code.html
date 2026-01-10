@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard Gerente de Zona</title>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1173d4",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                        "card-light": "#ffffff",
+                        "card-dark": "#1a2632",
+                        "text-primary-light": "#111418",
+                        "text-primary-dark": "#ffffff",
+                        "text-secondary-light": "#617589",
+                        "text-secondary-dark": "#9aaab9",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-text-primary-light dark:text-text-primary-dark transition-colors duration-200">
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Top Navigation -->
+<header class="sticky top-0 z-50 w-full bg-card-light dark:bg-card-dark border-b border-gray-200 dark:border-gray-800 shadow-sm">
+<div class="flex items-center justify-between px-6 py-3 lg:px-10">
+<div class="flex items-center gap-4">
+<div class="flex items-center justify-center size-10 rounded-xl bg-primary/10 text-primary">
+<span class="material-symbols-outlined">analytics</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-[-0.015em] hidden sm:block">Dashboard Ejecutivo</h2>
+</div>
+<div class="flex flex-1 justify-end items-center gap-4 sm:gap-8">
+<div class="hidden md:flex items-center gap-6 lg:gap-9">
+<a class="text-sm font-semibold text-primary" href="#">Dashboard</a>
+<a class="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark hover:text-primary dark:hover:text-primary transition-colors" href="#">Reportes</a>
+<a class="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark hover:text-primary dark:hover:text-primary transition-colors" href="#">Mi Equipo</a>
+<a class="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark hover:text-primary dark:hover:text-primary transition-colors" href="#">Configuración</a>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center size-10 rounded-full bg-background-light dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+<span class="material-symbols-outlined text-text-secondary-light dark:text-text-secondary-dark">notifications</span>
+</button>
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-10 ring-2 ring-primary/20" data-alt="Profile picture of the zone manager" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDnGAQLvBI-dB2Ir8Gegt0kV-5lLmqG4qVWo5Ivh4OjN2fOZ2McJNYFBgFmVOXin_GyoFWZFSypHUtFrWvNh8-Q781Cm_cag-wgNODjc-ZqurxOXJFClNBohlMyZH8dr9w-L3jeQWiGnYXFKjS_CnpKB_HASggQDcy_SIgmQcoL4HmAn9b3zdirGTRCcZT5nnElBYCA-W9x-mgmTfuq0oWgVXB56_k6L1FuG-vT-L19wZTnFZJHSlyFW_naxw1JQf9rNzev_7l-MBY");'>
+</div>
+</div>
+</div>
+</div>
+<!-- Mobile Menu (Visible on small screens) -->
+<div class="flex md:hidden border-t border-gray-200 dark:border-gray-800 py-2 px-6 gap-4 overflow-x-auto no-scrollbar">
+<a class="text-sm font-semibold text-primary whitespace-nowrap" href="#">Dashboard</a>
+<a class="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark whitespace-nowrap" href="#">Reportes</a>
+<a class="text-sm font-medium text-text-secondary-light dark:text-text-secondary-dark whitespace-nowrap" href="#">Mi Equipo</a>
+</div>
+</header>
+<main class="flex-1 flex flex-col items-center py-6 px-4 md:px-8 lg:px-16 w-full">
+<div class="w-full max-w-7xl flex flex-col gap-6">
+<!-- Page Heading -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div class="flex flex-col gap-1">
+<h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-text-primary-light dark:text-text-primary-dark">
+                            Zona Norte
+                        </h1>
+<p class="text-text-secondary-light dark:text-text-secondary-dark text-base">
+                            Hola, Carlos. Revisa el desempeño y valida los reportes pendientes.
+                        </p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center gap-2 bg-card-light dark:bg-card-dark border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-text-primary-light dark:text-text-primary-dark px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[20px]">download</span>
+                            Exportar Data
+                        </button>
+<button class="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-sm shadow-primary/30">
+<span class="material-symbols-outlined text-[20px]">add</span>
+                            Nuevo Reporte
+                        </button>
+</div>
+</div>
+<!-- KPI Stats -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<!-- Stat Card 1 -->
+<div class="flex flex-col gap-2 rounded-xl bg-card-light dark:bg-card-dark p-6 border border-gray-200 dark:border-gray-800 shadow-sm">
+<div class="flex items-center justify-between">
+<p class="text-text-secondary-light dark:text-text-secondary-dark text-sm font-medium">Ventas Totales (MXN)</p>
+<span class="material-symbols-outlined text-primary bg-primary/10 p-1 rounded-md text-[20px]">attach_money</span>
+</div>
+<div class="flex items-end gap-3">
+<p class="text-3xl font-bold tracking-tight">$4,250,000</p>
+<span class="flex items-center text-green-600 dark:text-green-400 text-sm font-bold bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full mb-1">
+<span class="material-symbols-outlined text-[16px] mr-0.5">trending_up</span>
+                                +15%
+                            </span>
+</div>
+<p class="text-xs text-text-secondary-light dark:text-text-secondary-dark mt-1">Comparado con mes anterior</p>
+</div>
+<!-- Stat Card 2 -->
+<div class="flex flex-col gap-2 rounded-xl bg-card-light dark:bg-card-dark p-6 border border-gray-200 dark:border-gray-800 shadow-sm">
+<div class="flex items-center justify-between">
+<p class="text-text-secondary-light dark:text-text-secondary-dark text-sm font-medium">Cumplimiento vs. Objetivo</p>
+<span class="material-symbols-outlined text-purple-600 bg-purple-100 dark:bg-purple-900/30 p-1 rounded-md text-[20px]">donut_large</span>
+</div>
+<div class="flex items-end gap-3">
+<p class="text-3xl font-bold tracking-tight">98%</p>
+<span class="flex items-center text-green-600 dark:text-green-400 text-sm font-bold bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full mb-1">
+                                +2.5%
+                            </span>
+</div>
+<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-2">
+<div class="bg-primary h-1.5 rounded-full" style="width: 98%"></div>
+</div>
+</div>
+<!-- Stat Card 3 (Action Required) -->
+<div class="flex flex-col gap-2 rounded-xl bg-card-light dark:bg-card-dark p-6 border-l-4 border-l-amber-500 border-y border-r border-gray-200 dark:border-gray-800 shadow-sm">
+<div class="flex items-center justify-between">
+<p class="text-text-secondary-light dark:text-text-secondary-dark text-sm font-medium">Reportes por Validar</p>
+<span class="material-symbols-outlined text-amber-600 bg-amber-100 dark:bg-amber-900/30 p-1 rounded-md text-[20px]">assignment_late</span>
+</div>
+<div class="flex items-end gap-3">
+<p class="text-3xl font-bold tracking-tight text-amber-600 dark:text-amber-500">12</p>
+<span class="text-xs text-text-secondary-light dark:text-text-secondary-dark mb-1 font-medium">Requieren atención inmediata</span>
+</div>
+<button class="mt-2 text-sm font-bold text-primary hover:underline text-left">Ver todos &gt;</button>
+</div>
+</div>
+<!-- Main Content Split -->
+<div class="flex flex-col lg:flex-row gap-6">
+<!-- Left Column: Charts -->
+<div class="flex flex-col gap-6 lg:w-1/2">
+<!-- Chart 1: Sales Trend -->
+<div class="rounded-xl bg-card-light dark:bg-card-dark border border-gray-200 dark:border-gray-800 shadow-sm p-6 flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div>
+<h3 class="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">Tendencia de Ventas (Q3)</h3>
+<p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">Jul - Sep 2023</p>
+</div>
+<div class="text-right">
+<p class="text-2xl font-bold tracking-tight text-primary">$4.2M</p>
+<p class="text-xs text-green-600 font-bold">+12% vs Q2</p>
+</div>
+</div>
+<!-- Simplified Chart Visualization -->
+<div class="relative h-48 w-full mt-2">
+<svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 100 50">
+<!-- Grid lines -->
+<line class="text-gray-400" stroke="currentColor" stroke-dasharray="2 2" stroke-opacity="0.1" stroke-width="0.5" x1="0" x2="100" y1="0" y2="0"></line>
+<line class="text-gray-400" stroke="currentColor" stroke-dasharray="2 2" stroke-opacity="0.1" stroke-width="0.5" x1="0" x2="100" y1="25" y2="25"></line>
+<line class="text-gray-400" stroke="currentColor" stroke-opacity="0.1" stroke-width="0.5" x1="0" x2="100" y1="50" y2="50"></line>
+<!-- Gradient fill -->
+<defs>
+<lineargradient id="chartGradient" x1="0" x2="0" y1="0" y2="1">
+<stop offset="0%" stop-color="#1173d4" stop-opacity="0.2"></stop>
+<stop offset="100%" stop-color="#1173d4" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<path d="M0,40 C10,38 20,30 30,32 C40,34 50,20 60,18 C70,16 80,10 90,8 C95,7 100,5 100,5 L100,50 L0,50 Z" fill="url(#chartGradient)"></path>
+<!-- Line -->
+<path d="M0,40 C10,38 20,30 30,32 C40,34 50,20 60,18 C70,16 80,10 90,8 C95,7 100,5 100,5" fill="none" stroke="#1173d4" stroke-linecap="round" stroke-width="1.5"></path>
+<!-- Points -->
+<circle class="dark:stroke-card-dark stroke-card-light" cx="0" cy="40" fill="#1173d4" r="1.5" stroke-width="0.5"></circle>
+<circle class="dark:stroke-card-dark stroke-card-light" cx="30" cy="32" fill="#1173d4" r="1.5" stroke-width="0.5"></circle>
+<circle class="dark:stroke-card-dark stroke-card-light" cx="60" cy="18" fill="#1173d4" r="1.5" stroke-width="0.5"></circle>
+<circle class="dark:stroke-card-dark stroke-card-light" cx="100" cy="5" fill="#1173d4" r="1.5" stroke-width="0.5"></circle>
+</svg>
+<div class="flex justify-between text-xs text-text-secondary-light dark:text-text-secondary-dark mt-2 font-medium">
+<span>Jul 01</span>
+<span>Ago 01</span>
+<span>Sep 01</span>
+<span>Hoy</span>
+</div>
+</div>
+</div>
+<!-- Chart 2: Manager Comparison -->
+<div class="rounded-xl bg-card-light dark:bg-card-dark border border-gray-200 dark:border-gray-800 shadow-sm p-6 flex flex-col gap-4">
+<h3 class="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">Comparativa por Gerente</h3>
+<div class="flex flex-col gap-4 mt-2">
+<!-- Bar 1 -->
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-sm">
+<span class="font-bold text-text-primary-light dark:text-text-primary-dark">Luis P.</span>
+<span class="text-text-secondary-light dark:text-text-secondary-dark font-medium">$1.8M</span>
+</div>
+<div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full" style="width: 85%"></div>
+</div>
+</div>
+<!-- Bar 2 -->
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-sm">
+<span class="font-bold text-text-primary-light dark:text-text-primary-dark">Ana G.</span>
+<span class="text-text-secondary-light dark:text-text-secondary-dark font-medium">$1.2M</span>
+</div>
+<div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-primary/70 h-2 rounded-full" style="width: 65%"></div>
+</div>
+</div>
+<!-- Bar 3 -->
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-sm">
+<span class="font-bold text-text-primary-light dark:text-text-primary-dark">Jorge M.</span>
+<span class="text-text-secondary-light dark:text-text-secondary-dark font-medium">$950k</span>
+</div>
+<div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-primary/50 h-2 rounded-full" style="width: 45%"></div>
+</div>
+</div>
+<!-- Bar 4 -->
+<div class="flex flex-col gap-1">
+<div class="flex justify-between text-sm">
+<span class="font-bold text-text-primary-light dark:text-text-primary-dark">Sofia L.</span>
+<span class="text-text-secondary-light dark:text-text-secondary-dark font-medium">$300k</span>
+</div>
+<div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2">
+<div class="bg-primary/30 h-2 rounded-full" style="width: 20%"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Validation List -->
+<div class="flex flex-col lg:w-1/2 rounded-xl bg-card-light dark:bg-card-dark border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+<div class="p-6 border-b border-gray-100 dark:border-gray-800 flex flex-wrap gap-4 justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
+<div>
+<h3 class="text-lg font-bold text-text-primary-light dark:text-text-primary-dark">Validación de Reportes</h3>
+<p class="text-sm text-text-secondary-light dark:text-text-secondary-dark">Acciones pendientes de tu equipo</p>
+</div>
+<div class="flex gap-2">
+<button class="p-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+<button class="p-2 text-text-secondary-light dark:text-text-secondary-dark hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm whitespace-nowrap">
+<thead class="bg-gray-50 dark:bg-gray-800/50 text-text-secondary-light dark:text-text-secondary-dark font-semibold uppercase tracking-wider text-xs">
+<tr>
+<th class="px-6 py-4">Reporte</th>
+<th class="px-6 py-4">Gerente</th>
+<th class="px-6 py-4">Monto</th>
+<th class="px-6 py-4">Estado</th>
+<th class="px-6 py-4 text-center">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+<!-- Row 1 -->
+<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+<td class="px-6 py-4 font-bold text-text-primary-light dark:text-text-primary-dark">#24901</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="size-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">LP</div>
+<span class="text-text-primary-light dark:text-text-primary-dark">Luis Pérez</span>
+</div>
+<span class="text-xs text-text-secondary-light dark:text-text-secondary-dark">Hoy, 09:30 AM</span>
+</td>
+<td class="px-6 py-4 font-medium text-text-primary-light dark:text-text-primary-dark">$45,200</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 border border-amber-100 dark:border-amber-800">
+<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                Procesando
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex justify-center items-center gap-2">
+<button class="size-9 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-green-200" title="Validar">
+<span class="material-symbols-outlined">check</span>
+</button>
+<button class="size-9 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-red-200" title="Rechazar">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+<td class="px-6 py-4 font-bold text-text-primary-light dark:text-text-primary-dark">#24902</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="size-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs font-bold">AG</div>
+<span class="text-text-primary-light dark:text-text-primary-dark">Ana Gómez</span>
+</div>
+<span class="text-xs text-text-secondary-light dark:text-text-secondary-dark">Ayer, 18:45 PM</span>
+</td>
+<td class="px-6 py-4 font-medium text-text-primary-light dark:text-text-primary-dark">$12,850</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 border border-amber-100 dark:border-amber-800">
+<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                Procesando
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex justify-center items-center gap-2">
+<button class="size-9 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-green-200" title="Validar">
+<span class="material-symbols-outlined">check</span>
+</button>
+<button class="size-9 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-red-200" title="Rechazar">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+<td class="px-6 py-4 font-bold text-text-primary-light dark:text-text-primary-dark">#24899</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="size-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">JM</div>
+<span class="text-text-primary-light dark:text-text-primary-dark">Jorge M.</span>
+</div>
+<span class="text-xs text-text-secondary-light dark:text-text-secondary-dark">Ayer, 16:20 PM</span>
+</td>
+<td class="px-6 py-4 font-medium text-text-primary-light dark:text-text-primary-dark">$8,400</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 border border-amber-100 dark:border-amber-800">
+<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                Procesando
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex justify-center items-center gap-2">
+<button class="size-9 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-green-200" title="Validar">
+<span class="material-symbols-outlined">check</span>
+</button>
+<button class="size-9 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-red-200" title="Rechazar">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+<td class="px-6 py-4 font-bold text-text-primary-light dark:text-text-primary-dark">#24888</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="size-6 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center text-xs font-bold">SL</div>
+<span class="text-text-primary-light dark:text-text-primary-dark">Sofia L.</span>
+</div>
+<span class="text-xs text-text-secondary-light dark:text-text-secondary-dark">12 Oct, 10:00 AM</span>
+</td>
+<td class="px-6 py-4 font-medium text-text-primary-light dark:text-text-primary-dark">$22,100</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 border border-amber-100 dark:border-amber-800">
+<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                Procesando
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex justify-center items-center gap-2">
+<button class="size-9 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-green-200" title="Validar">
+<span class="material-symbols-outlined">check</span>
+</button>
+<button class="size-9 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-red-200" title="Rechazar">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group">
+<td class="px-6 py-4 font-bold text-text-primary-light dark:text-text-primary-dark">#24885</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-2">
+<div class="size-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">LP</div>
+<span class="text-text-primary-light dark:text-text-primary-dark">Luis Pérez</span>
+</div>
+<span class="text-xs text-text-secondary-light dark:text-text-secondary-dark">12 Oct, 09:15 AM</span>
+</td>
+<td class="px-6 py-4 font-medium text-text-primary-light dark:text-text-primary-dark">$156,000</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 border border-amber-100 dark:border-amber-800">
+<span class="size-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                Procesando
+                                            </span>
+</td>
+<td class="px-6 py-4">
+<div class="flex justify-center items-center gap-2">
+<button class="size-9 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-green-200" title="Validar">
+<span class="material-symbols-outlined">check</span>
+</button>
+<button class="size-9 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95 border border-transparent hover:border-red-200" title="Rechazar">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 flex justify-center">
+<button class="text-sm font-bold text-primary hover:underline">Ver los 7 reportes restantes</button>
+</div>
+</div>
+</div>
+<!-- Footer Info -->
+<footer class="py-6 mt-4 text-center border-t border-gray-200 dark:border-gray-800">
+<p class="text-xs text-text-secondary-light dark:text-text-secondary-dark">
+                        © 2023 Dashboard Ejecutivo México. Datos actualizados hace 15 minutos.
+                    </p>
+</footer>
+</div>
+</main>
+</div>
+</body></html>

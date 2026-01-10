@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@config "../tailwind.config.js";
+
+@layer base {
+  html {
+    color-scheme: light;
+    scroll-behavior: smooth;
+  }
+  
+  html.light {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: #f6f7f8;
+    color: #111418;
+    font-family: 'Manrope', 'Noto Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html.dark body {
+    background-color: #101922;
+    color: white;
+  }
+
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+}
+
+@layer utilities {
+  /* Aplicar corner-shape squircle a todos los elementos con bordes redondeados */
+  [class*="rounded"] {
+    corner-shape: squircle;
+  }
+}
+
+@theme {
+  --color-primary: #1173d4;
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #101922;
+  --font-display: 'Manrope', 'Noto Sans', sans-serif;
+}
+
