@@ -20,6 +20,7 @@ import AdminProductos from './pages/AdminProductos'
 import AdminHistorial from './pages/AdminHistorial'
 import AdminLogs from './pages/AdminLogs'
 import AdminDetalleZona from './pages/AdminDetalleZona'
+import GestionPeriodos from './pages/GestionPeriodos'
 import { Role } from './types/auth'
 import { Toaster } from 'react-hot-toast'
 
@@ -163,6 +164,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[Role.Administrador, Role.GerenteEstacion, Role.GerenteZona]}>
               <CorreccionReporte />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gestion-periodos"
+          element={
+            <ProtectedRoute allowedRoles={[Role.Administrador]}>
+              <GestionPeriodos />
             </ProtectedRoute>
           }
         />

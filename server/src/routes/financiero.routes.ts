@@ -6,6 +6,7 @@ import {
   obtenerGastos,
   registrarEntrega,
   obtenerEntregas,
+  verificarEstadoPeriodo,
   obtenerLimiteDisponible,
   obtenerResguardoEstacion,
   cerrarPeriodoContable,
@@ -53,6 +54,12 @@ router.post('/entregas', registrarEntrega);
  * Obtener entregas de una estación o zona
  */
 router.get('/entregas', obtenerEntregas);
+
+/**
+ * GET /api/financiero/estado-periodo
+ * Verificar si un período está abierto o cerrado
+ */
+router.get('/estado-periodo', verificarEstadoPeriodo);
 
 /**
  * GET /api/financiero/limite

@@ -40,17 +40,8 @@ export const authController = {
         })
       }
 
-      // Obtener zonas del usuario si es Gerente de Zona
-      let zona_id = undefined
-      if (user.role_code === 'GerenteZona') {
-        const zonasResult = await pool.query(
-          'SELECT zona_id FROM user_zonas WHERE user_id = $1 LIMIT 1',
-          [user.id]
-        )
-        if (zonasResult.rows.length > 0) {
-          zona_id = zonasResult.rows[0].zona_id
-        }
-      }
+      // Obtener zona_id directamente del usuario si es Gerente de Zona
+      let zona_id = user.role_code === 'GerenteZona' ? user.zona_id : undefined
       
       // Obtener estaciones del usuario si es Gerente de Estación
       let estaciones = []
@@ -123,16 +114,8 @@ export const authController = {
       }
 
       // Generar token igual que en login
-      let zona_id = undefined
-      if (user.role_code === 'GerenteZona') {
-        const zonasResult = await pool.query(
-          'SELECT zona_id FROM user_zonas WHERE user_id = $1 LIMIT 1',
-          [user.id]
-        )
-        if (zonasResult.rows.length > 0) {
-          zona_id = zonasResult.rows[0].zona_id
-        }
-      }
+      // Obtener zona_id directamente del usuario si es Gerente de Zona
+      let zona_id = user.role_code === 'GerenteZona' ? user.zona_id : undefined
       
       let estaciones = []
       if (user.role_code === 'GerenteEstacion') {
@@ -192,18 +175,11 @@ export const authController = {
       const user = result.rows[0]
       
       // Obtener datos adicionales según rol
-      let zona_id = undefined
+      // Obtener zona_id directamente del usuario si es Gerente de Zona
+      let zona_id = user.role === 'GerenteZona' ? user.zona_id : undefined
       let estaciones = []
       
-      if (user.role === 'GerenteZona') {
-        const zonasResult = await pool.query(
-          'SELECT zona_id FROM user_zonas WHERE user_id = $1 LIMIT 1',
-          [user.id]
-        )
-        if (zonasResult.rows.length > 0) {
-          zona_id = zonasResult.rows[0].zona_id
-        }
-      } else if (user.role === 'GerenteEstacion') {
+      if (user.role === 'GerenteEstacion') {
         const estacionesResult = await pool.query(
           'SELECT estacion_id FROM user_estaciones WHERE user_id = $1',
           [user.id]

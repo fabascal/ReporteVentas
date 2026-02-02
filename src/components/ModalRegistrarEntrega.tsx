@@ -43,6 +43,18 @@ export default function ModalRegistrarEntrega({
   const mesFormulario = fechaSeleccionada.getMonth() + 1;
   const anioFormulario = fechaSeleccionada.getFullYear();
 
+  // Verificar estado del período (abierto/cerrado)
+  const { data: estadoPeriodo, isLoading: loadingEstado } = useQuery({
+    queryKey: ['estado-periodo-entrega', formData.estacion_id, mesFormulario, anioFormulario],
+    queryFn: () => financieroService.verificarEstadoPeriodo(
+      'estacion',
+      formData.estacion_id,
+      mesFormulario,
+      anioFormulario
+    ),
+    enabled: !!formData.estacion_id && !!formData.fecha,
+  });
+
   // Obtener resguardo actualizado basado en la fecha del formulario
   const { data: resguardoActualizado, isLoading: loadingResguardo } = useQuery({
     queryKey: ['resguardo-estacion', formData.estacion_id, mesFormulario, anioFormulario],
@@ -55,15 +67,19 @@ export default function ModalRegistrarEntrega({
   });
 
   // Obtener información de la estación seleccionada
-  // Usar el resguardo actualizado si está disponible, sino usar el del prop
-  const estacionSeleccionada = resguardoActualizado || estaciones.find(e => e.estacion_id === formData.estacion_id);
+  // SIEMPRE usar el resguardo actualizado basado en la fecha del modal
+  // NO mezclar con datos del dashboard
+  const estacionSeleccionada = resguardoActualizado;
 
   const registrarMutation = useMutation({
     mutationFn: (data: any) => financieroService.registrarEntrega(data),
     onSuccess: () => {
       toast.success('Entrega registrada exitosamente');
+      // Invalidar todas las queries relacionadas con el dashboard y resguardo
       queryClient.invalidateQueries({ queryKey: ['dashboard-financiero'] });
       queryClient.invalidateQueries({ queryKey: ['entregas'] });
+      queryClient.invalidateQueries({ queryKey: ['resguardo-estacion'] });
+      queryClient.invalidateQueries({ queryKey: ['alertas-financiero'] });
       onClose();
     },
     onError: (error: any) => {
@@ -83,9 +99,15 @@ export default function ModalRegistrarEntrega({
     }
     if (!formData.monto || parseFloat(formData.monto) <= 0) {
       newErrors.monto = 'Ingrese un monto válido mayor a cero';
-    } else if (estacionSeleccionada && parseFloat(formData.monto) > estacionSeleccionada.saldo_resguardo) {
-      // Solo advertencia, no bloquear
-      newErrors.monto = `⚠️ El monto excede el resguardo actual ($${estacionSeleccionada.saldo_resguardo.toFixed(2)}). Verifica antes de continuar.`;
+    } else if (estacionSeleccionada) {
+      // Redondear ambos valores a 2 decimales para evitar errores de precisión de punto flotante
+      const montoIngresado = Math.round(parseFloat(formData.monto) * 100) / 100;
+      const saldoDisponible = Math.round(estacionSeleccionada.saldo_resguardo * 100) / 100;
+      
+      if (montoIngresado > saldoDisponible) {
+        // BLOQUEAR si excede el saldo disponible
+        newErrors.monto = `El monto excede el saldo disponible de la estación ($${estacionSeleccionada.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}). No se puede entregar más de lo que tiene.`;
+      }
     }
 
     setErrors(newErrors);
@@ -99,18 +121,8 @@ export default function ModalRegistrarEntrega({
       return;
     }
 
-    // Si hay advertencia pero el usuario quiere continuar
-    if (errors.monto && errors.monto.startsWith('⚠️')) {
-      const confirmar = window.confirm(
-        'El monto de la entrega excede el resguardo actual de la estación. ¿Desea continuar?'
-      );
-      if (!confirmar) {
-        return;
-      }
-    }
-
     registrarMutation.mutate({
-      tipo_entrega: 'estacion_a_zona',
+      tipo_entrega: 'estacion_zona',
       estacion_id: formData.estacion_id,
       zona_id: zona_id,
       fecha: formData.fecha,
@@ -132,11 +144,14 @@ export default function ModalRegistrarEntrega({
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b border-[#e6e8eb] dark:border-slate-700">
           <div>
-            <h2 className="text-2xl font-bold text-[#111418] dark:text-white">Registrar Entrega</h2>
+            <h2 className="text-2xl font-bold text-[#111418] dark:text-white">Registrar Entrega de Estación</h2>
             <p className="text-sm text-[#60758a] dark:text-gray-400 mt-1">
               {zona_nombre} - {new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(
                 new Date(periodo.anio, periodo.mes - 1)
               )}
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+              💰 Recibir dinero de una estación hacia la zona
             </p>
           </div>
           <button
@@ -146,6 +161,56 @@ export default function ModalRegistrarEntrega({
             <span className="material-symbols-outlined text-2xl">close</span>
           </button>
         </div>
+
+        {/* Banner de estado del período */}
+        {loadingEstado && formData.estacion_id && (
+          <div className="mx-6 mt-6 p-4 rounded-lg bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+            <span className="text-sm text-[#617589] dark:text-slate-400">Verificando estado del período...</span>
+          </div>
+        )}
+        
+        {estadoPeriodo && !estadoPeriodo.periodo_abierto && (
+          <div className="mx-6 mt-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700">
+            <div className="flex items-start">
+              <span className="material-symbols-outlined text-red-600 dark:text-red-400 mr-3 text-3xl">lock</span>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-red-800 dark:text-red-300 mb-1">
+                  ⚠️ Período Cerrado
+                </h3>
+                <p className="text-sm text-red-700 dark:text-red-400 mb-2">
+                  {estadoPeriodo.mensaje}
+                </p>
+                <div className="text-xs text-red-600 dark:text-red-500 space-y-1">
+                  {estadoPeriodo.cierre_operativo && (
+                    <div className="flex items-center">
+                      <span className="material-symbols-outlined text-sm mr-1">cancel</span>
+                      <span>Cierre operativo activo</span>
+                    </div>
+                  )}
+                  {estadoPeriodo.cierre_contable && (
+                    <div className="flex items-center">
+                      <span className="material-symbols-outlined text-sm mr-1">verified</span>
+                      <span>Liquidación contable cerrada</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-red-600 dark:text-red-500 mt-3 font-semibold">
+                  No se pueden registrar entregas en este período. Contacta al gerente de zona o administrador para reabrirlo.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {estadoPeriodo && estadoPeriodo.periodo_abierto && formData.estacion_id && (
+          <div className="mx-6 mt-6 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 flex items-center">
+            <span className="material-symbols-outlined text-green-600 dark:text-green-400 mr-2 text-xl">check_circle</span>
+            <span className="text-sm text-green-700 dark:text-green-400 font-medium">
+              Período abierto - Puedes registrar entregas
+            </span>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
@@ -166,12 +231,17 @@ export default function ModalRegistrarEntrega({
               <option value="">Seleccione una estación</option>
               {estaciones.map((est) => (
                 <option key={est.estacion_id} value={est.estacion_id}>
-                  {est.estacion_nombre} - Resguardo: ${est.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  {est.estacion_nombre}
                 </option>
               ))}
             </select>
             {errors.estacion_id && (
               <p className="text-red-500 text-sm mt-1">{errors.estacion_id}</p>
+            )}
+            {!formData.estacion_id && (
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                💡 Selecciona una estación para ver su resguardo disponible en la fecha indicada
+              </p>
             )}
           </div>
 
@@ -183,16 +253,20 @@ export default function ModalRegistrarEntrega({
             </div>
           )}
           {estacionSeleccionada && !loadingResguardo && (
-            <div className="p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800/50 dark:to-slate-700/50 border border-blue-200 dark:border-slate-600">
+            <div className="p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800/50 dark:to-slate-700/50 border-2 border-blue-300 dark:border-blue-600">
               <div className="flex justify-between items-start mb-3">
                 <h3 className="font-semibold text-[#111418] dark:text-white flex items-center">
                   <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 mr-2">account_balance</span>
                   {estacionSeleccionada.estacion_nombre}
                 </h3>
-                <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 px-2 py-1 bg-white dark:bg-slate-700 rounded">
-                  {new Intl.DateTimeFormat('es-MX', { month: 'short', year: 'numeric' }).format(fechaSeleccionada)}
+                <span className="text-xs font-bold text-white dark:text-white px-3 py-1 bg-blue-600 dark:bg-blue-500 rounded-full shadow-sm">
+                  📅 {new Intl.DateTimeFormat('es-MX', { month: 'short', year: 'numeric' }).format(fechaSeleccionada).toUpperCase()}
                 </span>
               </div>
+              <p className="text-xs text-blue-700 dark:text-blue-300 mb-3 flex items-center">
+                <span className="material-symbols-outlined text-sm mr-1">info</span>
+                Datos calculados para la fecha seleccionada arriba
+              </p>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-[#617589] dark:text-slate-400">Merma Generada:</p>
@@ -300,7 +374,7 @@ export default function ModalRegistrarEntrega({
             </button>
             <button
               type="submit"
-              disabled={registrarMutation.isPending}
+              disabled={registrarMutation.isPending || (estadoPeriodo && !estadoPeriodo.periodo_abierto)}
               className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {registrarMutation.isPending ? (

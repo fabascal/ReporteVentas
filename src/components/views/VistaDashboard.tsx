@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { ReporteVentas } from '../../types/reportes'
+import { useEjerciciosActivos } from '../../hooks/useEjerciciosActivos'
 import {
   LineChart,
   Line,
@@ -26,6 +27,12 @@ interface VistaDashboardProps {
   setFechaFiltro: (fecha: string) => void
   reportesAcumulados: ReporteVentas[]
   reportesDiaSeleccionado: ReporteVentas[]
+  estadoPeriodo?: {
+    esta_cerrado: boolean
+    fecha_cierre?: string
+    cerrado_por?: string
+    mensaje: string
+  }
   onOpenCierre: () => void
 }
 
@@ -42,11 +49,32 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
   setFechaFiltro,
   reportesAcumulados,
   reportesDiaSeleccionado,
+  estadoPeriodo,
   onOpenCierre,
 }) => {
+  const { aniosDisponibles } = useEjerciciosActivos()
+  
   // Usar mediodía para evitar problemas de zona horaria
   const fechaSeleccionada = new Date(fechaFiltro + 'T12:00:00')
   const nombreMes = fechaSeleccionada.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+  
+  // Extraer mes y año del fechaFiltro para los selectores
+  const mesActual = parseInt(fechaFiltro.split('-')[1])
+  const anioActual = parseInt(fechaFiltro.split('-')[0])
+  
+  const handleMesChange = (nuevoMes: number) => {
+    const fecha = `${anioActual}-${String(nuevoMes).padStart(2, '0')}-01`
+    setFechaFiltro(fecha)
+  }
+  
+  const handleAnioChange = (nuevoAnio: number) => {
+    const fecha = `${nuevoAnio}-${String(mesActual).padStart(2, '0')}-01`
+    setFechaFiltro(fecha)
+  }
+  
+  const getMesNombre = (): string[] => {
+    return ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+  }
   
   // Calcular el último día del mes que tiene reportes
   const diaSeleccionado = useMemo(() => {
@@ -73,37 +101,92 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
             <p className="text-base font-normal">Análisis y comparación de ventas por fecha</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <label htmlFor="fecha-filtro" className="text-sm font-medium text-[#111418] dark:text-white">
-              Mes:
+        <div className="flex items-center gap-3">
+          <div>
+            <label className="block text-xs font-medium text-[#60758a] dark:text-gray-400 mb-1">
+              Mes
             </label>
-            <input
-              id="fecha-filtro"
-              type="month"
-              value={fechaFiltro.substring(0, 7)}
-              onChange={(e) => {
-                const fecha = e.target.value + '-01'
-                setFechaFiltro(fecha)
-              }}
-              className="px-4 py-2 rounded-lg border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
-            />
+            <select
+              value={mesActual}
+              onChange={(e) => handleMesChange(parseInt(e.target.value))}
+              className="px-3 py-2 border border-[#e6e8eb] dark:border-slate-700 rounded-lg bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {getMesNombre().map((mes, index) => (
+                <option key={index + 1} value={index + 1}>
+                  {mes}
+                </option>
+              ))}
+            </select>
           </div>
+          
+          <div>
+            <label className="block text-xs font-medium text-[#60758a] dark:text-gray-400 mb-1">
+              Año
+            </label>
+            <select
+              value={anioActual}
+              onChange={(e) => handleAnioChange(parseInt(e.target.value))}
+              className="px-3 py-2 border border-[#e6e8eb] dark:border-slate-700 rounded-lg bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {aniosDisponibles.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-center gap-2 text-sm text-[#617589] dark:text-slate-400 bg-white dark:bg-[#1a2632] px-4 py-2 rounded-full border border-[#e6e8eb] dark:border-slate-700 shadow-sm">
             <span className="material-symbols-outlined text-lg">calendar_month</span>
             <span>
               Período: <span className="font-semibold text-[#111418] dark:text-white capitalize">{nombreMes}</span>
             </span>
           </div>
+          
           <button
             onClick={onOpenCierre}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-sm"
+            disabled={estadoPeriodo?.esta_cerrado}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors shadow-sm ${
+              estadoPeriodo?.esta_cerrado
+                ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
+            title={estadoPeriodo?.esta_cerrado ? 'El periodo operativo ya está cerrado' : 'Abrir modal de cierre mensual'}
           >
-            <span className="material-symbols-outlined text-lg">lock</span>
+            <span className="material-symbols-outlined text-lg">
+              {estadoPeriodo?.esta_cerrado ? 'lock' : 'lock_open'}
+            </span>
             <span>Cierre Mensual</span>
           </button>
         </div>
       </div>
+
+      {/* Banner de periodo cerrado */}
+      {estadoPeriodo?.esta_cerrado && (
+        <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600 dark:border-blue-400 p-4 rounded-lg">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl">info</span>
+            <div className="flex-1">
+              <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">
+                Periodo Operativo Cerrado
+              </h3>
+              <p className="text-sm text-blue-800 dark:text-blue-400">
+                Este periodo ya ha sido cerrado y no permite realizar el cierre mensual nuevamente.
+                {estadoPeriodo.cerrado_por && (
+                  <span className="block mt-1">
+                    Cerrado por: <strong>{estadoPeriodo.cerrado_por}</strong>
+                  </span>
+                )}
+                {estadoPeriodo.fecha_cierre && (
+                  <span className="block">
+                    Fecha: <strong>{new Date(estadoPeriodo.fecha_cierre).toLocaleString('es-MX')}</strong>
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards - Totales del Mes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

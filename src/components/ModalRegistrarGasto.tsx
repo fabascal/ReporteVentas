@@ -44,6 +44,18 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
   // ID de la entidad (estación o zona)
   const entidadId = tipo === 'estacion' ? formData.estacion_id : formData.zona_id;
 
+  // Verificar estado del período (abierto/cerrado)
+  const { data: estadoPeriodo, isLoading: loadingEstado } = useQuery({
+    queryKey: ['estado-periodo', tipo, entidadId, mesFormulario, anioFormulario],
+    queryFn: () => financieroService.verificarEstadoPeriodo(
+      tipo,
+      entidadId,
+      mesFormulario,
+      anioFormulario
+    ),
+    enabled: !!entidadId && !!formData.fecha,
+  });
+
   // Obtener límite disponible basado en la fecha del formulario
   const { data: limiteData, isLoading: loadingLimite } = useQuery({
     queryKey: ['limite-disponible', tipo, entidadId, mesFormulario, anioFormulario],
@@ -60,8 +72,12 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
     mutationFn: (data: any) => financieroService.registrarGasto(data),
     onSuccess: () => {
       toast.success('Gasto registrado exitosamente');
+      // Invalidar todas las queries relacionadas con el dashboard y resguardo
       queryClient.invalidateQueries({ queryKey: ['dashboard-financiero'] });
       queryClient.invalidateQueries({ queryKey: ['gastos'] });
+      queryClient.invalidateQueries({ queryKey: ['resguardo-estacion'] });
+      queryClient.invalidateQueries({ queryKey: ['limite-disponible'] });
+      queryClient.invalidateQueries({ queryKey: ['alertas-financiero'] });
       onClose();
     },
     onError: (error: any) => {
@@ -148,6 +164,56 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
             <span className="material-symbols-outlined text-2xl">close</span>
           </button>
         </div>
+
+        {/* Banner de estado del período */}
+        {loadingEstado && entidadId && (
+          <div className="mx-6 mt-6 p-4 rounded-lg bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+            <span className="text-sm text-[#617589] dark:text-slate-400">Verificando estado del período...</span>
+          </div>
+        )}
+        
+        {estadoPeriodo && !estadoPeriodo.periodo_abierto && (
+          <div className="mx-6 mt-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-500 dark:border-red-700">
+            <div className="flex items-start">
+              <span className="material-symbols-outlined text-red-600 dark:text-red-400 mr-3 text-3xl">lock</span>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-red-800 dark:text-red-300 mb-1">
+                  ⚠️ Período Cerrado
+                </h3>
+                <p className="text-sm text-red-700 dark:text-red-400 mb-2">
+                  {estadoPeriodo.mensaje}
+                </p>
+                <div className="text-xs text-red-600 dark:text-red-500 space-y-1">
+                  {estadoPeriodo.cierre_operativo && (
+                    <div className="flex items-center">
+                      <span className="material-symbols-outlined text-sm mr-1">cancel</span>
+                      <span>Cierre operativo activo</span>
+                    </div>
+                  )}
+                  {estadoPeriodo.cierre_contable && (
+                    <div className="flex items-center">
+                      <span className="material-symbols-outlined text-sm mr-1">verified</span>
+                      <span>Liquidación contable cerrada</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-red-600 dark:text-red-500 mt-3 font-semibold">
+                  No se pueden registrar gastos en este período. Contacta al gerente de zona o administrador para reabrirlo.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {estadoPeriodo && estadoPeriodo.periodo_abierto && (
+          <div className="mx-6 mt-6 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 flex items-center">
+            <span className="material-symbols-outlined text-green-600 dark:text-green-400 mr-2 text-xl">check_circle</span>
+            <span className="text-sm text-green-700 dark:text-green-400 font-medium">
+              Período abierto - Puedes registrar gastos
+            </span>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
@@ -335,7 +401,7 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
             </button>
             <button
               type="submit"
-              disabled={registrarMutation.isPending}
+              disabled={registrarMutation.isPending || (estadoPeriodo && !estadoPeriodo.periodo_abierto)}
               className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {registrarMutation.isPending ? (

@@ -12,6 +12,7 @@ import VistaDashboard from '../components/views/VistaDashboard'
 import ControlFinancieroZona from '../components/ControlFinancieroZona'
 import { exportarReporteExcel } from '../utils/exportarExcel'
 import { obtenerControlFinanciero } from '../services/cierreMensualService'
+import ejerciciosService from '../services/ejerciciosService'
 
 type VistaActiva = 'dashboard' | 'revision' | 'historial'
 
@@ -70,6 +71,9 @@ export default function DashboardGerenteZona() {
   // Usar zona_id directamente del usuario (GerenteZona) o zonas[0] para compatibilidad
   const zonaId = user?.zona_id || user?.zonas?.[0]
   
+  console.log('[DashboardGerenteZona] zonaId:', zonaId, 'user:', user)
+  console.log('[DashboardGerenteZona] showCierreModal:', showCierreModal)
+  
   const { data: controlFinanciero, isLoading: isLoadingControl } = useQuery({
     queryKey: ['control-financiero', zonaId, fechaFiltro],
     queryFn: () => {
@@ -84,6 +88,19 @@ export default function DashboardGerenteZona() {
       return obtenerControlFinanciero(zonaId, anio, mes)
     },
     enabled: !!zonaId && vistaActiva === 'dashboard',
+  })
+
+  // Verificar estado del periodo operativo
+  const { data: estadoPeriodo } = useQuery({
+    queryKey: ['estado-periodo-operativo', zonaId, fechaFiltro],
+    queryFn: () => {
+      if (!zonaId) return Promise.reject('No hay zona ID')
+      const fecha = new Date(fechaFiltro + 'T12:00:00')
+      const anio = fecha.getFullYear()
+      const mes = fecha.getMonth() + 1
+      return ejerciciosService.verificarEstadoPeriodoOperativo(zonaId, anio, mes)
+    },
+    enabled: !!zonaId && vistaActiva === 'dashboard'
   })
 
   // Datos para gráficas basados en la fecha seleccionada
@@ -327,7 +344,11 @@ export default function DashboardGerenteZona() {
               setFechaFiltro={setFechaFiltro}
               reportesAcumulados={reportesAcumulados}
               reportesDiaSeleccionado={reportesDiaSeleccionado}
-              onOpenCierre={() => setShowCierreModal(true)}
+              estadoPeriodo={estadoPeriodo}
+              onOpenCierre={() => {
+                console.log('[DashboardGerenteZona] Botón Cierre Mensual presionado')
+                setShowCierreModal(true)
+              }}
             />
             
             {/* Control Financiero */}

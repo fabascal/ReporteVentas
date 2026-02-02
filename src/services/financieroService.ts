@@ -42,7 +42,7 @@ interface RegistrarGastoData {
 interface Entrega {
   id: string;
   fecha: string;
-  tipo_entrega: 'estacion_a_zona' | 'zona_a_direccion';
+  tipo_entrega: 'estacion_zona' | 'zona_direccion';
   estacion_id?: string;
   zona_id?: string;
   zona_origen_id?: string;
@@ -61,7 +61,7 @@ interface EntregasResponse {
 }
 
 interface RegistrarEntregaData {
-  tipo_entrega: 'estacion_a_zona' | 'zona_a_direccion';
+  tipo_entrega: 'estacion_zona' | 'zona_direccion';
   estacion_id?: string;
   zona_id: string;
   fecha: string;
@@ -156,6 +156,27 @@ export const financieroService = {
     const response = await api.get<EntregasResponse>(
       `/financiero/entregas?${params.toString()}`
     );
+    return response.data;
+  },
+
+  /**
+   * Verificar estado del período (abierto/cerrado)
+   */
+  verificarEstadoPeriodo: async (entidad_tipo: 'estacion' | 'zona', entidad_id: string, mes: number, anio: number) => {
+    const params = new URLSearchParams();
+    params.append('entidad_tipo', entidad_tipo);
+    params.append('entidad_id', entidad_id);
+    params.append('mes', mes.toString());
+    params.append('anio', anio.toString());
+    
+    const response = await api.get<{
+      periodo_abierto: boolean;
+      cierre_operativo: boolean;
+      cierre_contable: boolean;
+      puede_registrar_gastos: boolean;
+      puede_registrar_entregas: boolean;
+      mensaje: string;
+    }>(`/financiero/estado-periodo?${params.toString()}`);
     return response.data;
   },
 

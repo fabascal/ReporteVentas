@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import financieroService from '../services/financieroService';
+import ejerciciosService from '../services/ejerciciosService';
 import { useAuth } from '../contexts/AuthContext';
 import { Role } from '../types/auth';
 import { Link } from 'react-router-dom';
@@ -8,9 +9,11 @@ import DynamicHeader from '../components/DynamicHeader';
 import ModalRegistrarGasto from '../components/ModalRegistrarGasto';
 import ModalRegistrarEntrega from '../components/ModalRegistrarEntrega';
 import ModalLiquidarPeriodo from '../components/ModalLiquidarPeriodo';
+import { useEjerciciosActivos } from '../hooks/useEjerciciosActivos';
 
 export default function DashboardFinanciero() {
   const { user } = useAuth();
+  const { aniosDisponibles, isLoading: loadingEjercicios } = useEjerciciosActivos();
   
   const [periodo, setPeriodo] = useState(() => {
     const now = new Date();
@@ -33,6 +36,21 @@ export default function DashboardFinanciero() {
     queryKey: ['alertas-financiero', periodo.mes, periodo.anio],
     queryFn: () => financieroService.getAlertas(periodo.mes, periodo.anio),
     enabled: user?.role === Role.GerenteZona || user?.role === Role.Direccion || user?.role === Role.Administrador,
+  });
+
+  // Verificar estado del periodo operativo y contable
+  const zona_id = user?.zona_id;
+  
+  const { data: estadoPeriodoOperativo } = useQuery({
+    queryKey: ['estado-periodo-operativo', zona_id, periodo.anio, periodo.mes],
+    queryFn: () => ejerciciosService.verificarEstadoPeriodoOperativo(zona_id!, periodo.anio, periodo.mes),
+    enabled: !!zona_id && user?.role === Role.GerenteZona,
+  });
+
+  const { data: estadoPeriodoContable } = useQuery({
+    queryKey: ['estado-periodo-contable', zona_id, periodo.anio, periodo.mes],
+    queryFn: () => ejerciciosService.verificarEstadoPeriodoContable(zona_id!, periodo.anio, periodo.mes),
+    enabled: !!zona_id && user?.role === Role.GerenteZona,
   });
 
   // Obtener estaciones para el formulario (solo para GerenteEstacion)
@@ -64,16 +82,6 @@ export default function DashboardFinanciero() {
 
   const handleAnioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setPeriodo({ ...periodo, anio: parseInt(e.target.value) });
-  };
-
-  const getCurrentYear = () => new Date().getFullYear();
-  const getYearOptions = () => {
-    const currentYear = getCurrentYear();
-    const years = [];
-    for (let i = currentYear; i >= currentYear - 5; i--) {
-      years.push(i);
-    }
-    return years;
   };
 
   const formatNumber = (value: string | number): string => {
@@ -204,7 +212,7 @@ export default function DashboardFinanciero() {
                   onChange={handleAnioChange}
                   className="px-4 py-2 border border-[#e6e8eb] dark:border-slate-700 rounded-lg bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  {getYearOptions().map((year) => (
+                  {aniosDisponibles.map((year) => (
                     <option key={year} value={year}>
                       {year}
                     </option>
@@ -252,6 +260,65 @@ export default function DashboardFinanciero() {
           </div>
         )}
 
+        {/* Banners de estado de periodos */}
+        {data.tipo === 'gerente_zona' && (estadoPeriodoOperativo?.esta_cerrado || estadoPeriodoContable?.esta_cerrado) && (
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Banner de periodo operativo cerrado */}
+            {estadoPeriodoOperativo?.esta_cerrado && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-600 dark:border-blue-400 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-2xl">lock</span>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-300 mb-1">
+                      Periodo Operativo Cerrado
+                    </h3>
+                    <p className="text-sm text-blue-800 dark:text-blue-400">
+                      Este periodo operativo ya ha sido cerrado. No se pueden registrar nuevas entregas ni gastos de zona.
+                      {estadoPeriodoOperativo.cerrado_por && (
+                        <span className="block mt-1">
+                          Cerrado por: <strong>{estadoPeriodoOperativo.cerrado_por}</strong>
+                        </span>
+                      )}
+                      {estadoPeriodoOperativo.fecha_cierre && (
+                        <span className="block">
+                          Fecha: <strong>{new Date(estadoPeriodoOperativo.fecha_cierre).toLocaleString('es-MX')}</strong>
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Banner de periodo contable cerrado */}
+            {estadoPeriodoContable?.esta_cerrado && (
+              <div className="bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-600 dark:border-purple-400 p-4 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-purple-600 dark:text-purple-400 text-2xl">verified</span>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-purple-900 dark:text-purple-300 mb-1">
+                      Periodo Contable Liquidado
+                    </h3>
+                    <p className="text-sm text-purple-800 dark:text-purple-400">
+                      Este periodo contable ya ha sido liquidado. No se puede volver a liquidar.
+                      {estadoPeriodoContable.cerrado_por && (
+                        <span className="block mt-1">
+                          Liquidado por: <strong>{estadoPeriodoContable.cerrado_por}</strong>
+                        </span>
+                      )}
+                      {estadoPeriodoContable.fecha_cierre && (
+                        <span className="block">
+                          Fecha: <strong>{new Date(estadoPeriodoContable.fecha_cierre).toLocaleString('es-MX')}</strong>
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Acciones rápidas */}
         <div className="mb-6 flex justify-end gap-3">
           {/* Botones para Gerente de Estación */}
@@ -270,25 +337,43 @@ export default function DashboardFinanciero() {
             <>
               <button 
                 onClick={() => setShowModalEntrega(true)}
-                className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm hover:shadow-md"
+                disabled={estadoPeriodoOperativo?.esta_cerrado}
+                className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md ${
+                  estadoPeriodoOperativo?.esta_cerrado
+                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700 text-white'
+                }`}
+                title={estadoPeriodoOperativo?.esta_cerrado ? 'Periodo operativo cerrado' : 'Registrar entregas de estaciones'}
               >
                 <span className="material-symbols-outlined mr-2 text-xl">payments</span>
                 Registrar Entrega
               </button>
               <button 
                 onClick={() => setShowModalGasto(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm hover:shadow-md"
-                title="Registrar gastos de la zona"
+                disabled={estadoPeriodoOperativo?.esta_cerrado}
+                className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md ${
+                  estadoPeriodoOperativo?.esta_cerrado
+                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                }`}
+                title={estadoPeriodoOperativo?.esta_cerrado ? 'Periodo operativo cerrado' : 'Registrar gastos de la zona'}
               >
                 <span className="material-symbols-outlined mr-2 text-xl">receipt_long</span>
                 Registrar Gasto Zona
               </button>
               <button 
                 onClick={() => setShowModalLiquidar(true)}
-                className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors shadow-sm hover:shadow-md"
-                title="Cerrar período contable"
+                disabled={estadoPeriodoContable?.esta_cerrado}
+                className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md ${
+                  estadoPeriodoContable?.esta_cerrado
+                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+                title={estadoPeriodoContable?.esta_cerrado ? 'Periodo contable ya cerrado' : 'Cerrar período contable'}
               >
-                <span className="material-symbols-outlined mr-2 text-xl">check_circle</span>
+                <span className="material-symbols-outlined mr-2 text-xl">
+                  {estadoPeriodoContable?.esta_cerrado ? 'lock' : 'check_circle'}
+                </span>
                 Liquidar Período
               </button>
             </>

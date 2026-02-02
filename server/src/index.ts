@@ -12,6 +12,7 @@ import { menusRoutes } from './routes/menus.routes.js'
 import rolesRoutes from './routes/roles.routes.js'
 import financieroRoutes from './routes/financiero.routes.js'
 import cierreMensualRoutes from './routes/cierreMensual.routes.js'
+import ejerciciosRoutes from './routes/ejercicios.routes.js'
 import { reportesRoutes } from './routes/reportes.routes.js'
 import externalRoutes from './routes/external.routes.js'
 
@@ -35,6 +36,7 @@ app.use('/api/menus', menusRoutes)
 app.use('/api/roles', rolesRoutes)
 app.use('/api/financiero', financieroRoutes)
 app.use('/api/cierre-mensual', cierreMensualRoutes)
+app.use('/api/ejercicios', ejerciciosRoutes)
 app.use('/api/reportes', reportesRoutes)
 app.use('/api/external', externalRoutes)
 
