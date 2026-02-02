@@ -4,11 +4,12 @@ import { ReactNode } from 'react'
 interface TablaReportesProps {
   reportes: ReporteVentas[]
   calcularTotalVentas: (reporte: ReporteVentas) => number
-  getEstadoBadge: (estado: EstadoReporte) => string
-  getEstadoIcon: (estado: EstadoReporte) => string
+  getEstadoBadge?: (estado: EstadoReporte) => string
+  getEstadoIcon?: (estado: EstadoReporte) => string
   handleVerDetalle: (reporte: ReporteVentas) => void
   handleCambiarEstado?: (reporte: ReporteVentas) => void
   showAcciones?: boolean
+  showEstado?: boolean
   showEditar?: boolean
   renderAcciones?: (reporte: ReporteVentas) => ReactNode
 }
@@ -21,6 +22,7 @@ export default function TablaReportes({
   handleVerDetalle,
   handleCambiarEstado,
   showAcciones = true,
+  showEstado = true,
   showEditar = true,
   renderAcciones,
 }: TablaReportesProps) {
@@ -47,9 +49,11 @@ export default function TablaReportes({
             <th className="px-6 py-4 text-right" scope="col">
               Total Ventas
             </th>
-            <th className="px-6 py-4" scope="col">
-              Estado
-            </th>
+            {showEstado && (
+              <th className="px-6 py-4" scope="col">
+                Estado
+              </th>
+            )}
             <th className="px-6 py-4" scope="col">
               Creado Por / Fecha Creación
             </th>
@@ -120,14 +124,16 @@ export default function TablaReportes({
                 <td className="px-6 py-4 text-right font-bold text-[#111418] dark:text-white">
                   ${totalVentas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
-                <td className="px-6 py-4">
-                  <span
-                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${getEstadoBadge(reporte.estado)}`}
-                  >
-                    <span className="material-symbols-outlined text-sm">{getEstadoIcon(reporte.estado)}</span>
-                    {reporte.estado}
-                  </span>
-                </td>
+                {showEstado && getEstadoBadge && getEstadoIcon && (
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold ${getEstadoBadge(reporte.estado)}`}
+                    >
+                      <span className="material-symbols-outlined text-sm">{getEstadoIcon(reporte.estado)}</span>
+                      {reporte.estado}
+                    </span>
+                  </td>
+                )}
                 <td className="px-6 py-4">
                   <div className="text-sm text-[#111418] dark:text-white">{reporte.creadoPor}</div>
                   {reporte.fechaCreacion && (

@@ -1,5 +1,6 @@
 import { ReporteVentas } from '../types/reportes'
 import { ReactNode } from 'react'
+import { formatFechaHora } from '../utils/dateUtils'
 
 interface DetalleReporteModalProps {
   reporte: ReporteVentas
@@ -150,6 +151,30 @@ export default function DetalleReporteModal({
                     </div>
                   </div>
                 )}
+                {/* Eficiencia Real */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-800 mt-3">
+                  <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Eficiencia Real</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Volumen (IFFB - IF)</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(reporte.premium.eficienciaReal || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Importe</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        ${(reporte.premium.eficienciaImporte || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Porcentaje</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(reporte.premium.eficienciaRealPorcentaje || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 {/* Nuevos campos de Inventario y Compras */}
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-800 mt-3">
                   <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Inventario y Compras</p>
@@ -276,6 +301,30 @@ export default function DetalleReporteModal({
                     </div>
                   </div>
                 )}
+                {/* Eficiencia Real */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-800 mt-3">
+                  <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Eficiencia Real</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Volumen (IFFB - IF)</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(reporte.magna.eficienciaReal || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Importe</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        ${(reporte.magna.eficienciaImporte || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Porcentaje</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(reporte.magna.eficienciaRealPorcentaje || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 {/* Nuevos campos de Inventario y Compras */}
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-800 mt-3">
                   <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Inventario y Compras</p>
@@ -402,6 +451,30 @@ export default function DetalleReporteModal({
                     </div>
                   </div>
                 )}
+                {/* Eficiencia Real */}
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-800 mt-3">
+                  <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Eficiencia Real</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Volumen (IFFB - IF)</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(reporte.diesel.eficienciaReal || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Importe</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        ${(reporte.diesel.eficienciaImporte || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Porcentaje</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(reporte.diesel.eficienciaRealPorcentaje || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 {/* Nuevos campos de Inventario y Compras */}
                 <div className="pt-3 border-t border-gray-200 dark:border-gray-800 mt-3">
                   <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Inventario y Compras</p>
@@ -502,7 +575,7 @@ export default function DetalleReporteModal({
                 <div className="mb-3">
                   <p className="text-sm font-semibold text-[#617589] dark:text-slate-400">Fecha de Revisión</p>
                   <p className="text-base text-[#111418] dark:text-white">
-                    {new Date(reporte.fechaRevision).toLocaleString('es-MX')}
+                    {formatFechaHora(reporte.fechaRevision)}
                   </p>
                 </div>
               )}

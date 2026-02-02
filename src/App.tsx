@@ -7,6 +7,11 @@ import DashboardGerenteEstacion from './pages/DashboardGerenteEstacion'
 import DashboardGerenteZona from './pages/DashboardGerenteZona'
 import DashboardDirector from './pages/DashboardDirector'
 import DashboardAdmin from './pages/DashboardAdmin'
+import DashboardFinanciero from './pages/DashboardFinanciero'
+import ReporteEficiencia from './pages/ReporteEficiencia'
+import ReporteVtas from './pages/ReporteVtas'
+import ReporteRevisionMensual from './pages/ReporteRevisionMensual'
+import CorreccionReporte from './pages/CorreccionReporte'
 import AdminUsuarios from './pages/AdminUsuarios'
 import AdminReportes from './pages/AdminReportes'
 import AdminConfiguracion from './pages/AdminConfiguracion'
@@ -14,12 +19,15 @@ import AdminZonasEstaciones from './pages/AdminZonasEstaciones'
 import AdminProductos from './pages/AdminProductos'
 import AdminHistorial from './pages/AdminHistorial'
 import AdminLogs from './pages/AdminLogs'
+import AdminDetalleZona from './pages/AdminDetalleZona'
 import { Role } from './types/auth'
+import { Toaster } from 'react-hot-toast'
 
 function App() {
   return (
     <AuthProvider>
       <DocumentTitle />
+      <Toaster position="top-right" />
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
@@ -51,6 +59,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[Role.Administrador]}>
               <DashboardAdmin />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard-financiero"
+          element={
+            <ProtectedRoute allowedRoles={[Role.GerenteEstacion, Role.GerenteZona, Role.Direccion, Role.Administrador]}>
+              <DashboardFinanciero />
             </ProtectedRoute>
           }
         />
@@ -87,6 +103,14 @@ function App() {
           }
         />
         <Route
+          path="/admin/zonas-estaciones/:id"
+          element={
+            <ProtectedRoute allowedRoles={[Role.Administrador]}>
+              <AdminDetalleZona />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admin/productos"
           element={
             <ProtectedRoute allowedRoles={[Role.Administrador]}>
@@ -110,6 +134,38 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/reporte-eficiencia"
+          element={
+            <ProtectedRoute allowedRoles={[Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion]}>
+              <ReporteEficiencia />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reporte-vtas"
+          element={
+            <ProtectedRoute allowedRoles={[Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion]}>
+              <ReporteVtas />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/revision-mensual"
+          element={
+            <ProtectedRoute allowedRoles={[Role.GerenteEstacion, Role.GerenteZona]}>
+              <ReporteRevisionMensual />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reportes/:id/correccion"
+          element={
+            <ProtectedRoute allowedRoles={[Role.Administrador, Role.GerenteEstacion, Role.GerenteZona]}>
+              <CorreccionReporte />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>
@@ -117,4 +173,3 @@ function App() {
 }
 
 export default App
-

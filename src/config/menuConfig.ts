@@ -41,6 +41,14 @@ export const menuConfig: MenuItem[] = [
     roles: [Role.Administrador],
   },
   {
+    id: 'admin-logs',
+    type: 'route',
+    path: '/admin/logs',
+    label: 'Logs',
+    icon: 'history',
+    roles: [Role.Administrador],
+  },
+  {
     id: 'admin-zonas',
     type: 'route',
     path: '/admin/zonas-estaciones',
@@ -64,7 +72,47 @@ export const menuConfig: MenuItem[] = [
     icon: 'inventory_2',
     roles: [Role.Administrador],
   },
+  {
+    id: 'reporte-eficiencia',
+    type: 'route',
+    path: '/reporte-eficiencia',
+    label: 'Eficiencia',
+    icon: 'monitoring',
+    roles: [Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion],
+  },
+  {
+    id: 'reporte-vtas',
+    type: 'route',
+    path: '/reporte-vtas',
+    label: 'Vtas',
+    icon: 'bar_chart',
+    roles: [Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion],
+  },
+  {
+    id: 'revision-mensual',
+    type: 'route',
+    path: '/revision-mensual',
+    label: 'Revisión Mensual',
+    icon: 'fact_check',
+    roles: [Role.GerenteEstacion],
+  },
+  {
+    id: 'dashboard-financiero',
+    type: 'route',
+    path: '/dashboard-financiero',
+    label: 'Control Financiero',
+    icon: 'account_balance',
+    roles: [Role.GerenteEstacion, Role.GerenteZona, Role.Direccion, Role.Administrador],
+  },
   // GerenteEstacion views
+  {
+    id: 'gerente-estacion-dashboard',
+    type: 'view',
+    viewId: 'dashboard',
+    label: 'Dashboard',
+    icon: 'dashboard',
+    roles: [Role.GerenteEstacion],
+  },
   {
     id: 'gerente-estacion-reportes',
     type: 'view',
@@ -165,4 +213,3 @@ export function getHeaderConfigForRole(role: Role): {
 
   return configs[role] || configs[Role.Administrador]
 }
-

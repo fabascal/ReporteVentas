@@ -7,10 +7,11 @@ interface AuthContextType {
   token: string | null
   isAuthenticated: boolean
   isLoading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<{ require2FA?: boolean; userId?: string; email?: string }>
   loginWithOAuth: (provider: string) => Promise<void>
   logout: () => void
   hasRole: (role: Role) => boolean
+  completeLogin: (token: string, user: User) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -26,8 +27,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedUser = localStorage.getItem('user')
 
     if (storedToken && storedUser) {
-      setToken(storedToken)
-      setUser(JSON.parse(storedUser))
+      try {
+        const parsedUser = JSON.parse(storedUser)
+        // Verificar que el token JWT no esté expirado
+        const tokenParts = storedToken.split('.')
+        if (tokenParts.length === 3) {
+          try {
+            const payload = JSON.parse(atob(tokenParts[1]))
+            const exp = payload.exp * 1000 // Convertir a milisegundos
+            
+            if (exp > Date.now()) {
+              // Token válido
+              setToken(storedToken)
+              setUser(parsedUser)
+            } else {
+              // Token expirado, limpiar
+              console.log('Token expirado, limpiando localStorage')
+              localStorage.removeItem('token')
+              localStorage.removeItem('user')
+            }
+          } catch (e) {
+            console.error('Error al decodificar token:', e)
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+          }
+        }
+      } catch (e) {
+        console.error('Error al parsear usuario:', e)
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
     }
     setIsLoading(false)
   }, [])
@@ -35,14 +64,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await authService.login(email, password)
-      setToken(response.token)
-      setUser(response.user)
-      localStorage.setItem('token', response.token)
-      localStorage.setItem('user', JSON.stringify(response.user))
+      
+      // Si requiere 2FA, devolver la respuesta sin configurar el estado
+      if ('require2FA' in response && response.require2FA) {
+        return response
+      }
+      
+      // Login normal (sin 2FA)
+      if ('token' in response && 'user' in response) {
+        setToken(response.token)
+        setUser(response.user)
+        localStorage.setItem('token', response.token)
+        localStorage.setItem('user', JSON.stringify(response.user))
+        return response
+      }
+      
+      throw new Error('Respuesta de login inválida')
     } catch (error) {
       console.error('Error en login:', error)
       throw error
     }
+  }
+
+  const completeLogin = (token: string, user: User) => {
+    setToken(token)
+    setUser(user)
+    localStorage.setItem('token', token)
+    localStorage.setItem('user', JSON.stringify(user))
   }
 
   const loginWithOAuth = async (provider: string) => {
@@ -77,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginWithOAuth,
         logout,
         hasRole,
+        completeLogin,
       }}
     >
       {children}

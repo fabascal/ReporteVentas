@@ -56,6 +56,8 @@ export default function AdminConfiguracion() {
   const [isSincronizando, setIsSincronizando] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [testMessage, setTestMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [syncDetalles, setSyncDetalles] = useState<string[]>([])
+  const [showSyncDetalles, setShowSyncDetalles] = useState(false)
   
   // Estado para gestión de menús
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
@@ -247,6 +249,8 @@ export default function AdminConfiguracion() {
 
     setIsSincronizando(true)
     setSaveMessage(null)
+    setSyncDetalles([])
+    setShowSyncDetalles(false)
 
     try {
       const resultado = await configuracionService.sincronizarReportes(
@@ -254,11 +258,17 @@ export default function AdminConfiguracion() {
         sincronizacionConfig.fechaFin
       )
 
+      // Guardar detalles si existen
+      if (resultado.resultado.detalles && resultado.resultado.detalles.length > 0) {
+        setSyncDetalles(resultado.resultado.detalles)
+        setShowSyncDetalles(true)
+      }
+
       setSaveMessage({
-        type: 'success',
+        type: resultado.resultado.errores > 0 ? 'error' : 'success',
         text: `${resultado.message}. Creados: ${resultado.resultado.creados}, Actualizados: ${resultado.resultado.actualizados}, Errores: ${resultado.resultado.errores}`,
       })
-      setTimeout(() => setSaveMessage(null), 8000)
+      setTimeout(() => setSaveMessage(null), 10000)
     } catch (error: any) {
       setSaveMessage({
         type: 'error',
@@ -1089,6 +1099,42 @@ export default function AdminConfiguracion() {
                   )}
                 </button>
               </div>
+
+              {/* Detalles de Sincronización */}
+              {showSyncDetalles && syncDetalles.length > 0 && (
+                <div className="mt-6 border-t border-[#e6e8eb] dark:border-slate-700 pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-sm font-bold text-[#111418] dark:text-white flex items-center gap-2">
+                      <span className="material-symbols-outlined text-lg">list</span>
+                      Detalle de Sincronización ({syncDetalles.length} registros)
+                    </h4>
+                    <button
+                      onClick={() => setShowSyncDetalles(false)}
+                      className="text-sm text-[#617589] hover:text-[#111418] dark:hover:text-white"
+                    >
+                      <span className="material-symbols-outlined text-lg">close</span>
+                    </button>
+                  </div>
+                  <div className="bg-[#f6f7f8] dark:bg-[#101922] rounded-lg p-4 max-h-96 overflow-y-auto">
+                    <ul className="space-y-1 text-sm font-mono">
+                      {syncDetalles.map((detalle, index) => (
+                        <li
+                          key={index}
+                          className={`${
+                            detalle.includes('✅ CREADO')
+                              ? 'text-green-600 dark:text-green-400'
+                              : detalle.includes('✅ ACTUALIZADO')
+                              ? 'text-blue-600 dark:text-blue-400'
+                              : 'text-red-600 dark:text-red-400'
+                          }`}
+                        >
+                          {detalle}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sincronizar Estaciones desde API Externa */}
@@ -1293,6 +1339,171 @@ interface FormularioMenuProps {
 function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuProps) {
   // Debug: ver qué datos recibe el formulario
   console.log('FormularioMenu - menu recibido:', menu)
+  const iconOptions = [
+    'dashboard',
+    'description',
+    'history',
+    'settings',
+    'people',
+    'inventory_2',
+    'location_on',
+    'admin_panel_settings',
+    'monitoring',
+    'bar_chart',
+    'analytics',
+    'storefront',
+    'task_alt',
+    'add',
+    'menu',
+    'receipt_long',
+    'table_view',
+    'list_alt',
+    'event_note',
+    'insights',
+    'timeline',
+  ]
+  const menuTemplates = [
+    {
+      label: 'Dashboard Administrador',
+      data: {
+        menu_id: 'admin-resumen',
+        tipo: 'route',
+        path: '/admin',
+        view_id: undefined,
+        label: 'Dashboard',
+        icon: 'dashboard',
+        orden: 1,
+        requiere_exact_match: true,
+        roles: [Role.Administrador],
+      },
+    },
+    {
+      label: 'Dashboard Gerente Estación',
+      data: {
+        menu_id: 'gerente-estacion-dashboard',
+        tipo: 'view',
+        path: undefined,
+        view_id: 'dashboard',
+        label: 'Dashboard',
+        icon: 'dashboard',
+        orden: 0,
+        requiere_exact_match: false,
+        roles: [Role.GerenteEstacion],
+      },
+    },
+    {
+      label: 'Dashboard Gerente Zona',
+      data: {
+        menu_id: 'gerente-zona-dashboard',
+        tipo: 'view',
+        path: undefined,
+        view_id: 'dashboard',
+        label: 'Dashboard',
+        icon: 'dashboard',
+        orden: 1,
+        requiere_exact_match: false,
+        roles: [Role.GerenteZona],
+      },
+    },
+    {
+      label: 'Dashboard Director',
+      data: {
+        menu_id: 'director-resumen',
+        tipo: 'view',
+        path: undefined,
+        view_id: 'resumen',
+        label: 'Resumen',
+        icon: 'dashboard',
+        orden: 1,
+        requiere_exact_match: false,
+        roles: [Role.Direccion],
+      },
+    },
+    {
+      label: 'Nueva Captura (Gerente Estación)',
+      data: {
+        menu_id: 'gerente-estacion-nueva-captura',
+        tipo: 'view',
+        path: undefined,
+        view_id: 'nuevaCaptura',
+        label: 'Nueva Captura',
+        icon: 'add',
+        orden: 2,
+        requiere_exact_match: false,
+        roles: [Role.GerenteEstacion],
+      },
+    },
+    {
+      label: 'Historial (Gerente Estación)',
+      data: {
+        menu_id: 'gerente-estacion-historial',
+        tipo: 'view',
+        path: undefined,
+        view_id: 'historial',
+        label: 'Historial',
+        icon: 'history',
+        orden: 3,
+        requiere_exact_match: false,
+        roles: [Role.GerenteEstacion],
+      },
+    },
+    {
+      label: 'Historial (Gerente Zona)',
+      data: {
+        menu_id: 'gerente-zona-historial',
+        tipo: 'view',
+        path: undefined,
+        view_id: 'historial',
+        label: 'Historial',
+        icon: 'history',
+        orden: 3,
+        requiere_exact_match: false,
+        roles: [Role.GerenteZona],
+      },
+    },
+    {
+      label: 'Configuración (Administrador)',
+      data: {
+        menu_id: 'admin-configuracion',
+        tipo: 'route',
+        path: '/admin/configuracion',
+        view_id: undefined,
+        label: 'Configuración',
+        icon: 'settings',
+        orden: 5,
+        requiere_exact_match: false,
+        roles: [Role.Administrador],
+      },
+    },
+    {
+      label: 'Vtas',
+      data: {
+        menu_id: 'reporte-vtas',
+        tipo: 'route',
+        path: '/reporte-vtas',
+        view_id: undefined,
+        label: 'Vtas',
+        icon: 'bar_chart',
+        orden: 20,
+        requiere_exact_match: false,
+        roles: [Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion],
+      },
+    },
+    {
+      label: 'RVtas (Eficiencia)',
+      data: {
+        menu_id: 'reporte-eficiencia',
+        tipo: 'route',
+        path: '/reporte-eficiencia',
+        view_id: undefined,
+        label: 'RVtas',
+        icon: 'monitoring',
+        orden: 21,
+        requiere_exact_match: false,
+        roles: [Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion],
+      },
+    },
+  ]
   
   // Inicializar el estado correctamente según el tipo del menú
   const [formData, setFormData] = useState<CreateMenuData>(() => {
@@ -1309,6 +1520,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
       roles: menu?.roles || [],
     }
   })
+  const [iconFilter, setIconFilter] = useState('')
   
   // Actualizar el estado cuando cambie el menú (por si se edita otro menú)
   useEffect(() => {
@@ -1351,8 +1563,16 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
       alert('El tipo "route" requiere un path')
       return
     }
+    if (formData.tipo === 'route' && formData.path && !formData.path.startsWith('/')) {
+      alert('El path debe iniciar con "/" (ej: /admin/reportes)')
+      return
+    }
     if (formData.tipo === 'view' && !formData.view_id) {
       alert('El tipo "view" requiere un view_id')
+      return
+    }
+    if (formData.tipo === 'view' && formData.view_id && !/^[a-zA-Z0-9_-]+$/.test(formData.view_id)) {
+      alert('El view_id solo debe contener letras, números, guion o guion bajo')
       return
     }
     // Limpiar campos que no corresponden al tipo
@@ -1380,6 +1600,35 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
           {menu ? 'Editar Menú' : 'Nuevo Menú'}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
+          {!menu && (
+            <div>
+              <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
+                Plantilla rápida (opcional)
+              </label>
+              <select
+                value=""
+                onChange={(e) => {
+                  const template = menuTemplates.find((t) => t.label === e.target.value)
+                  if (template) {
+                    setFormData({
+                      ...(template.data as CreateMenuData),
+                    })
+                  }
+                }}
+                className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+              >
+                <option value="">Selecciona una plantilla</option>
+                {menuTemplates.map((template) => (
+                  <option key={template.label} value={template.label}>
+                    {template.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-[#617589] dark:text-slate-400 mt-1">
+                Rellena automáticamente los campos para menús comunes. Puedes editar cualquier valor.
+              </p>
+            </div>
+          )}
           <div>
             <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
               Menu ID (identificador único) *
@@ -1392,6 +1641,11 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
               required
               disabled={!!menu}
             />
+            {!menu && !formData.menu_id && formData.label && (
+              <p className="text-xs text-[#617589] dark:text-slate-400 mt-1">
+                Sugerencia: usa guiones y minúsculas (ej: reporte-vtas, gerente-zona-historial).
+              </p>
+            )}
           </div>
 
           <div>
@@ -1475,14 +1729,53 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
             <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
               Icono (Material Symbols) *
             </label>
-            <input
-              type="text"
-              value={formData.icon}
-              onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-              className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
-              placeholder="dashboard"
-              required
-            />
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-3xl text-[#1173d4]">
+                {formData.icon || 'help'}
+              </span>
+              <input
+                type="text"
+                value={formData.icon}
+                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                className="flex-1 px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+                placeholder="dashboard"
+                required
+              />
+            </div>
+            <div className="mt-3">
+              <input
+                type="text"
+                value={iconFilter}
+                onChange={(e) => setIconFilter(e.target.value)}
+                className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+                placeholder="Buscar icono..."
+              />
+              <div className="mt-3 grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-40 overflow-y-auto">
+                {iconOptions
+                  .filter((icon) => icon.includes(iconFilter.toLowerCase()))
+                  .map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, icon })}
+                      className={`flex flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs transition-colors ${
+                        formData.icon === icon
+                          ? 'border-[#1173d4] bg-blue-50 dark:bg-blue-900/30 text-[#1173d4]'
+                          : 'border-[#e6e8eb] dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-[#111f2e]'
+                      }`}
+                      title={icon}
+                    >
+                      <span className="material-symbols-outlined text-lg">{icon}</span>
+                      <span className="truncate w-full">{icon}</span>
+                    </button>
+                  ))}
+              </div>
+              {!iconOptions.includes(formData.icon) && formData.icon && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                  El icono no está en la lista sugerida. Si no existe, no se mostrará.
+                </p>
+              )}
+            </div>
           </div>
 
           <div>

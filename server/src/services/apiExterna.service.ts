@@ -310,10 +310,26 @@ export class ApiExternaService {
       const estaciones = Array.from(estacionesMap.values())
       console.log(`Se encontraron ${estaciones.length} estaciones únicas`)
 
-      // Verificar que la zona existe
+      // Verificar que la zona existe, si no, buscar la primera disponible
+      let zonaIdFinal = zonaId
       const zonaCheck = await pool.query('SELECT id FROM zonas WHERE id = $1', [zonaId])
+      
       if (zonaCheck.rows.length === 0) {
-        throw new Error(`La zona con ID ${zonaId} no existe`)
+        console.warn(`La zona con ID ${zonaId} no existe. Buscando zona por defecto...`)
+        const zonaDefault = await pool.query('SELECT id FROM zonas LIMIT 1')
+        
+        if (zonaDefault.rows.length === 0) {
+          // Si no hay ninguna zona, crear una por defecto
+          console.warn('No existen zonas en la base de datos. Creando zona por defecto "General"...')
+          const nuevaZona = await pool.query(
+            'INSERT INTO zonas (nombre, activa) VALUES ($1, $2) RETURNING id',
+            ['General', true]
+          )
+          zonaIdFinal = nuevaZona.rows[0].id
+        } else {
+          zonaIdFinal = zonaDefault.rows[0].id
+          console.log(`Usando zona por defecto con ID: ${zonaIdFinal}`)
+        }
       }
 
       let creadas = 0
@@ -353,7 +369,7 @@ export class ApiExternaService {
               // Crear nueva estación
               await pool.query(
                 'INSERT INTO estaciones (nombre, zona_id, identificador_externo, activa) VALUES ($1, $2, $3, $4)',
-                [estacion.nombre, zonaId, estacion.identificadorExterno, true]
+                [estacion.nombre, zonaIdFinal, estacion.identificadorExterno, true]
               )
               creadas++
               console.log(`Creada estación: ${estacion.nombre} (${estacion.identificadorExterno})`)
@@ -533,8 +549,13 @@ export class ApiExternaService {
   /**
    * Sincroniza los datos de la API externa con la base de datos
    */
-  async sincronizarDatos(fechaInicio: string, fechaFin: string, usuarioId: string): Promise<{ creados: number; actualizados: number; errores: number }> {
+  async sincronizarDatos(fechaInicio: string, fechaFin: string, usuarioId: string): Promise<{ creados: number; actualizados: number; errores: number; detalles: string[] }> {
     try {
+      console.log(`\n========== INICIANDO SINCRONIZACIÓN ==========`)
+      console.log(`Fecha Inicio: ${fechaInicio}`)
+      console.log(`Fecha Fin: ${fechaFin}`)
+      console.log(`Usuario ID: ${usuarioId}`)
+      
       // Obtener credenciales de la base de datos
       const usuarioResult = await pool.query(
         'SELECT valor FROM configuracion WHERE clave = $1',
@@ -561,34 +582,43 @@ export class ApiExternaService {
 
       // Obtener datos
       const datos = await this.obtenerDatosReportes(token, fechaInicio, fechaFin)
+      console.log(`Total de registros recibidos de API: ${datos.length}`)
 
       // Mapear datos (ahora es async)
       const reportesMapeados = await this.mapearDatosAReportes(datos)
+      console.log(`Total de estaciones mapeadas: ${reportesMapeados.size}`)
 
       let creados = 0
       let actualizados = 0
       let errores = 0
+      const detalles: string[] = []
 
       // Procesar cada reporte
       for (const [identificador, datosReporte] of reportesMapeados.entries()) {
         try {
+          console.log(`\n--- Procesando: Identificador ${identificador} ---`)
+          
           // Buscar estación por identificador externo
           const estacionResult = await pool.query(
-            'SELECT id FROM estaciones WHERE identificador_externo = $1',
+            'SELECT id, nombre FROM estaciones WHERE identificador_externo = $1',
             [identificador]
           )
 
           if (estacionResult.rows.length === 0) {
-            console.warn(`Estación con identificador externo ${identificador} no encontrada. Se omite.`)
+            const mensaje = `❌ ERROR: Estación con identificador "${identificador}" no encontrada en la base de datos`
+            console.error(mensaje)
+            detalles.push(mensaje)
             errores++
             continue
           }
 
           const estacionId = estacionResult.rows[0].id
+          const estacionNombre = estacionResult.rows[0].nombre
+          console.log(`   Estación encontrada: ${estacionNombre} (ID: ${estacionId})`)
 
           // Verificar si ya existe un reporte para esta estación y fecha
           const reporteExistente = await pool.query(
-            'SELECT id FROM reportes WHERE estacion_id = $1 AND fecha = $2',
+            'SELECT id FROM reportes WHERE estacion_id = $1 AND fecha::date = $2::date',
             [estacionId, fechaInicio]
           )
 
@@ -646,6 +676,18 @@ export class ApiExternaService {
 
           // Función helper para guardar productos
           const guardarProductosReporte = async (reporteId: string, productos: any, esActualizacion: boolean = false) => {
+            // Obtener la fecha del reporte (necesaria para particionamiento)
+            const reporteResult = await pool.query(
+              `SELECT fecha FROM reportes WHERE id = $1`,
+              [reporteId]
+            )
+            
+            if (reporteResult.rows.length === 0) {
+              throw new Error(`Reporte ${reporteId} no encontrado`)
+            }
+            
+            const fechaReporte = reporteResult.rows[0].fecha
+
             const productosCatalogo = await pool.query(
               `SELECT id, tipo_producto FROM productos_catalogo WHERE activo = true`
             )
@@ -659,31 +701,43 @@ export class ApiExternaService {
               await pool.query(`DELETE FROM reporte_productos WHERE reporte_id = $1`, [reporteId])
             }
 
-            for (const [tipoProducto, datos] of Object.entries(productos)) {
+            for (const [tipoProducto, datos] of Object.entries(productos) as [string, any][]) {
               const productoId = productosMap.get(tipoProducto.toLowerCase())
               if (!productoId) continue
+
+              // Calcular eficiencia real
+              const precio = parseFloat(datos.precio || 0)
+              const litros = parseFloat(datos.litros || 0)
+              const ifVal = parseFloat(datos.if || 0)
+              const iffbVal = parseFloat(datos.iffb || 0)
+              
+              const eficienciaReal = iffbVal - ifVal
+              const eficienciaImporte = eficienciaReal * precio
+              let eficienciaRealPorcentaje = litros > 0 ? (eficienciaReal / litros) * 100 : 0
+              
+              // Validar y limitar eficienciaRealPorcentaje a DECIMAL(8,4) - máximo 9999.9999
+              if (eficienciaRealPorcentaje > 9999.9999) {
+                console.warn(`[apiExterna] Advertencia: eficienciaRealPorcentaje excede límite (${eficienciaRealPorcentaje}), limitando a 9999.9999`)
+                eficienciaRealPorcentaje = 9999.9999
+              } else if (eficienciaRealPorcentaje < -9999.9999) {
+                console.warn(`[apiExterna] Advertencia: eficienciaRealPorcentaje excede límite negativo (${eficienciaRealPorcentaje}), limitando a -9999.9999`)
+                eficienciaRealPorcentaje = -9999.9999
+              }
 
               await pool.query(
                 `
                 INSERT INTO reporte_productos (
                   reporte_id, producto_id, precio, litros, importe,
                   merma_volumen, merma_importe, merma_porcentaje,
-                  iib, compras, cct, v_dsc, dc, dif_v_dsc, if, iffb
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-                ON CONFLICT (reporte_id, producto_id) DO UPDATE SET
-                  precio = EXCLUDED.precio,
-                  litros = EXCLUDED.litros,
-                  importe = EXCLUDED.importe,
-                  merma_volumen = EXCLUDED.merma_volumen,
-                  merma_importe = EXCLUDED.merma_importe,
-                  merma_porcentaje = EXCLUDED.merma_porcentaje,
-                  updated_at = CURRENT_TIMESTAMP
+                  iib, compras, cct, v_dsc, dc, dif_v_dsc, if, iffb,
+                  eficiencia_real, eficiencia_importe, eficiencia_real_porcentaje, fecha
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
                 `,
                 [
                   reporteId,
                   productoId,
-                  datos.precio || 0,
-                  datos.litros || 0,
+                  precio,
+                  litros,
                   datos.importe || 0,
                   datos.mermaVolumen || 0,
                   datos.mermaImporte || 0,
@@ -694,8 +748,12 @@ export class ApiExternaService {
                   datos.vDsc || 0,
                   datos.dc || 0,
                   datos.difVDsc || 0,
-                  datos.if || 0,
-                  datos.iffb || 0,
+                  ifVal,
+                  iffbVal,
+                  eficienciaReal,
+                  eficienciaImporte,
+                  eficienciaRealPorcentaje,
+                  fechaReporte,
                 ]
               )
             }
@@ -710,12 +768,15 @@ export class ApiExternaService {
             // Actualizar productos
             await guardarProductosReporte(reporteExistente.rows[0].id, productosParaGuardar, true)
             actualizados++
+            const mensaje = `✅ ACTUALIZADO: ${estacionNombre} - Fecha: ${fechaInicio}`
+            console.log(`   ${mensaje}`)
+            detalles.push(mensaje)
           } else {
             // Crear nuevo reporte (solo campos generales)
             const result = await pool.query(
               `
               INSERT INTO reportes (estacion_id, fecha, estado, creado_por)
-              VALUES ($1, $2, $3, $4)
+              VALUES ($1, $2::date, $3, $4)
               RETURNING id
               `,
               [estacionId, fechaInicio, 'Pendiente', usuarioId]
@@ -723,14 +784,26 @@ export class ApiExternaService {
             // Guardar productos
             await guardarProductosReporte(result.rows[0].id, productosParaGuardar, false)
             creados++
+            const mensaje = `✅ CREADO: ${estacionNombre} - Fecha: ${fechaInicio}`
+            console.log(`   ${mensaje}`)
+            detalles.push(mensaje)
           }
-        } catch (error) {
-          console.error(`Error al procesar reporte para estación ${identificador}:`, error)
+        } catch (error: any) {
+          const mensaje = `❌ ERROR: Estación "${identificador}" - ${error.message || error}`
+          console.error(mensaje)
+          console.error('   Detalle completo:', error)
+          detalles.push(mensaje)
           errores++
         }
       }
 
-      return { creados, actualizados, errores }
+      console.log(`\n========== RESUMEN DE SINCRONIZACIÓN ==========`)
+      console.log(`✅ Creados: ${creados}`)
+      console.log(`🔄 Actualizados: ${actualizados}`)
+      console.log(`❌ Errores: ${errores}`)
+      console.log(`===============================================\n`)
+
+      return { creados, actualizados, errores, detalles }
     } catch (error) {
       console.error('Error al sincronizar datos:', error)
       throw error

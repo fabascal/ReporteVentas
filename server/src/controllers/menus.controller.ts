@@ -2,6 +2,9 @@ import { Request, Response } from 'express'
 import { pool } from '../config/database.js'
 import { Role } from '../types/auth.js'
 
+const isValidMenuId = (value: string) => /^[a-z0-9-]+$/.test(value)
+const isValidViewId = (value: string) => /^[a-zA-Z0-9_-]+$/.test(value)
+
 export const menusController = {
   // Obtener todos los menús
   async getMenus(req: Request, res: Response) {
@@ -176,6 +179,9 @@ export const menusController = {
       if (!menu_id || !tipo || !label || !icon) {
         return res.status(400).json({ error: 'Faltan campos requeridos: menu_id, tipo, label, icon' })
       }
+      if (!isValidMenuId(menu_id)) {
+        return res.status(400).json({ error: 'menu_id inválido. Use solo minúsculas, números y guiones.' })
+      }
 
       if (tipo === 'route' && !path) {
         return res.status(400).json({ error: 'El tipo "route" requiere un campo "path" (ruta de navegación)' })
@@ -192,6 +198,12 @@ export const menusController = {
 
       if (tipo === 'view' && path) {
         return res.status(400).json({ error: 'El tipo "view" no debe tener un "path". Use "view_id" en su lugar.' })
+      }
+      if (tipo === 'route' && path && !path.startsWith('/')) {
+        return res.status(400).json({ error: 'El path debe iniciar con "/" (ej: /admin/reportes)' })
+      }
+      if (tipo === 'view' && view_id && !isValidViewId(view_id)) {
+        return res.status(400).json({ error: 'view_id inválido. Use letras, números, guion o guion bajo.' })
       }
 
       if (!roles || !Array.isArray(roles) || roles.length === 0) {
@@ -294,6 +306,10 @@ export const menusController = {
       const tipoActual = menuActual.rows[0].tipo
       const tipoNuevo = tipo || tipoActual
 
+      if (menu_id && !isValidMenuId(menu_id)) {
+        return res.status(400).json({ error: 'menu_id inválido. Use solo minúsculas, números y guiones.' })
+      }
+
       // Validaciones solo si se está cambiando el tipo
       if (tipo && tipo !== tipoActual) {
         // Se está cambiando el tipo
@@ -311,6 +327,9 @@ export const menusController = {
         if (view_id !== undefined && view_id !== null) {
           return res.status(400).json({ error: 'El tipo "route" no debe tener un "view_id". Use "path" en su lugar.' })
         }
+        if (path && !path.startsWith('/')) {
+          return res.status(400).json({ error: 'El path debe iniciar con "/" (ej: /admin/reportes)' })
+        }
       }
 
       if (tipoNuevo === 'view') {
@@ -318,6 +337,9 @@ export const menusController = {
         // Permitir path como null o undefined si solo se están actualizando los roles
         if (path !== undefined && path !== null && path !== '') {
           return res.status(400).json({ error: 'El tipo "view" no debe tener un "path". Use "view_id" en su lugar.' })
+        }
+        if (view_id && !isValidViewId(view_id)) {
+          return res.status(400).json({ error: 'view_id inválido. Use letras, números, guion o guion bajo.' })
         }
       }
 

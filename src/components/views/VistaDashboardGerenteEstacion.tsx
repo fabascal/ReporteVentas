@@ -105,9 +105,9 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
       }
 
       const datos = agrupados.get(estacionNombre)!
-      datos.Premium += r.premium?.litros || 0
-      datos.Magna += r.magna?.litros || 0
-      datos.Diesel += r.diesel?.litros || 0
+      datos.Premium += r.premium?.litros_vendidos || 0
+      datos.Magna += r.magna?.litros_vendidos || 0
+      datos.Diesel += r.diesel?.litros_vendidos || 0
     })
 
     return Array.from(agrupados.values()).sort((a, b) => {
@@ -143,16 +143,16 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
 
       const datos = agrupados.get(estacionNombre)!
 
-      if (r.premium?.mermaPorcentaje !== undefined && r.premium.mermaPorcentaje > 0) {
-        datos.Premium.total += r.premium.mermaPorcentaje
+      if (r.premium?.merma_porcentaje !== undefined && r.premium.merma_porcentaje > 0) {
+        datos.Premium.total += r.premium.merma_porcentaje
         datos.Premium.count += 1
       }
-      if (r.magna?.mermaPorcentaje !== undefined && r.magna.mermaPorcentaje > 0) {
-        datos.Magna.total += r.magna.mermaPorcentaje
+      if (r.magna?.merma_porcentaje !== undefined && r.magna.merma_porcentaje > 0) {
+        datos.Magna.total += r.magna.merma_porcentaje
         datos.Magna.count += 1
       }
-      if (r.diesel?.mermaPorcentaje !== undefined && r.diesel.mermaPorcentaje > 0) {
-        datos.Diesel.total += r.diesel.mermaPorcentaje
+      if (r.diesel?.merma_porcentaje !== undefined && r.diesel.merma_porcentaje > 0) {
+        datos.Diesel.total += r.diesel.merma_porcentaje
         datos.Diesel.count += 1
       }
     })
@@ -225,9 +225,9 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
   const totales = useMemo(() => {
     return reportesFiltrados.reduce(
       (acc, r) => {
-        acc.premium += r.premium?.litros || 0
-        acc.magna += r.magna?.litros || 0
-        acc.diesel += r.diesel?.litros || 0
+        acc.premium += r.premium?.litros_vendidos || 0
+        acc.magna += r.magna?.litros_vendidos || 0
+        acc.diesel += r.diesel?.litros_vendidos || 0
         acc.aceites += r.aceites || 0
         return acc
       },

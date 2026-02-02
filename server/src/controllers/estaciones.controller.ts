@@ -36,9 +36,9 @@ export const estacionesController = {
         )`
         params.push(req.user.id)
       } else if (req.user.role === 'GerenteZona') {
-        // Gerente de zona ve estaciones de sus zonas asignadas
-        query += ` AND e.zona_id IN (
-          SELECT zona_id FROM user_zonas WHERE user_id = $${paramCount}
+        // Gerente de zona ve estaciones de su zona asignada (users.zona_id)
+        query += ` AND e.zona_id = (
+          SELECT zona_id FROM users WHERE id = $${paramCount}
         )`
         params.push(req.user.id)
       }

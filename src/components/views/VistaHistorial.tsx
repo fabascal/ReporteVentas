@@ -1,22 +1,24 @@
 import { useQuery } from '@tanstack/react-query'
 import { reportesService } from '../../services/reportesService'
-import { ReporteVentas, EstadoReporte } from '../../types/reportes'
+import { ReporteVentas } from '../../types/reportes'
 import { Role } from '../../types/auth'
 import TablaReportes from '../TablaReportes'
 import DetalleReporteModal from '../DetalleReporteModal'
 import Paginacion from '../Paginacion'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface VistaHistorialProps {
   userRole: Role
   titulo?: string
   descripcion?: string
+  estadoFiltro?: string
   onExportarExcel?: (reporte: ReporteVentas) => void
 }
 
-export default function VistaHistorial({ userRole, titulo = 'Historial de Reportes', descripcion = 'Reportes ya revisados y procesados', onExportarExcel }: VistaHistorialProps) {
+export default function VistaHistorial({ userRole, titulo = 'Historial de Reportes', descripcion = 'Reportes capturados en el período', estadoFiltro, onExportarExcel }: VistaHistorialProps) {
   // Debug: verificar que la función se esté pasando
-  console.log('VistaHistorial - onExportarExcel:', !!onExportarExcel)
+  const navigate = useNavigate()
   
   const [showDetalleModal, setShowDetalleModal] = useState(false)
   const [reporteDetalle, setReporteDetalle] = useState<ReporteVentas | null>(null)
@@ -24,49 +26,29 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
   const limit = 20
 
   // Estados para filtros
-  const [filtroEstado, setFiltroEstado] = useState<EstadoReporte | 'Todos'>('Todos')
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('')
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('')
   const [busqueda, setBusqueda] = useState('')
 
-  // Obtener reportes con paginación (el backend filtra según el rol y estado)
+  // Obtener reportes con paginación - el backend maneja TODOS los filtros
   const { data: reportesData, isLoading } = useQuery({
-    queryKey: ['reportes', 'historial', userRole, page],
-    queryFn: () => reportesService.getReportes(page, limit, 'Aprobado,Rechazado'),
+    queryKey: ['reportes', 'historial', userRole, page, estadoFiltro, filtroFechaDesde, filtroFechaHasta, busqueda],
+    queryFn: () => reportesService.getReportes(
+      page, 
+      limit, 
+      estadoFiltro,
+      busqueda || undefined,
+      undefined, // estacionId - no aplicamos filtro aquí, el backend filtra según rol
+      filtroFechaDesde || undefined,
+      filtroFechaHasta || undefined
+    ),
   })
 
   const reportes = reportesData?.data || []
   const pagination = reportesData?.pagination || { page: 1, limit, total: 0, totalPages: 1 }
-
-  // Filtrar reportes según el rol (el backend ya filtra, pero por seguridad)
-  const reportesBase = reportes.filter((r) => {
-    if (userRole === 'GerenteEstacion') {
-      return r.estado === EstadoReporte.Aprobado || r.estado === EstadoReporte.Rechazado
-    } else if (userRole === 'GerenteZona') {
-      return r.estado === EstadoReporte.Aprobado || r.estado === EstadoReporte.Rechazado
-    } else if (userRole === 'Administrador') {
-      return r.estado === EstadoReporte.Aprobado || r.estado === EstadoReporte.Rechazado
-    } else if (userRole === 'Direccion') {
-      return r.estado === EstadoReporte.Aprobado
-    }
-    return false
-  })
-
-  // Aplicar filtros del lado del cliente sobre los datos paginados
-  const reportesFiltrados = reportesBase.filter((reporte) => {
-    if (filtroEstado !== 'Todos' && reporte.estado !== filtroEstado) return false
-    if (filtroFechaDesde && reporte.fecha < filtroFechaDesde) return false
-    if (filtroFechaHasta && reporte.fecha > filtroFechaHasta) return false
-    if (busqueda) {
-      const busquedaLower = busqueda.toLowerCase()
-      return (
-        reporte.estacionNombre.toLowerCase().includes(busquedaLower) ||
-        (reporte.creadoPor && reporte.creadoPor.toLowerCase().includes(busquedaLower)) ||
-        reporte.id.toLowerCase().includes(busquedaLower)
-      )
-    }
-    return true
-  })
+  
+  // Ya no necesitamos filtrar en el cliente - el backend lo hace todo
+  const reportesFiltrados = reportes
 
   // Manejar cambio de página
   const handlePageChange = (newPage: number) => {
@@ -75,47 +57,12 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
   }
 
   // Resetear a página 1 cuando cambian los filtros
-  const handleFiltroChange = () => {
+  useEffect(() => {
     setPage(1)
-  }
-
-  // Contar aprobados y rechazados de la página actual (solo para referencia visual)
-  // Nota: Estos son solo de la página actual, no el total general
-  const aprobadosEnPagina = reportesFiltrados.filter((r) => r.estado === EstadoReporte.Aprobado).length
-  const rechazadosEnPagina = reportesFiltrados.filter((r) => r.estado === EstadoReporte.Rechazado).length
+  }, [estadoFiltro, filtroFechaDesde, filtroFechaHasta, busqueda])
 
   const calcularTotalVentas = (reporte: ReporteVentas) => {
     return reporte.premium.importe + reporte.magna.importe + reporte.diesel.importe + (reporte.aceites || 0)
-  }
-
-  const getEstadoBadge = (estado: EstadoReporte) => {
-    switch (estado) {
-      case EstadoReporte.Pendiente:
-        return 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
-      case EstadoReporte.EnRevision:
-        return 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-      case EstadoReporte.Aprobado:
-        return 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-      case EstadoReporte.Rechazado:
-        return 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-      default:
-        return 'bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-400'
-    }
-  }
-
-  const getEstadoIcon = (estado: EstadoReporte) => {
-    switch (estado) {
-      case EstadoReporte.Pendiente:
-        return 'schedule'
-      case EstadoReporte.EnRevision:
-        return 'hourglass_empty'
-      case EstadoReporte.Aprobado:
-        return 'check_circle'
-      case EstadoReporte.Rechazado:
-        return 'cancel'
-      default:
-        return 'help'
-    }
   }
 
   const handleVerDetalle = (reporte: ReporteVentas) => {
@@ -138,8 +85,8 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
         </div>
       </div>
 
-      {/* KPI Cards - Mostrando total general y estadísticas de la página actual */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      {/* KPI Cards - Total general */}
+      <div className="grid grid-cols-1 gap-4 mb-8">
         <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
@@ -155,36 +102,11 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-[#617589] dark:text-slate-400">Aprobados (página actual)</p>
-              <p className="text-3xl font-black text-green-600 dark:text-green-400 mt-2">{aprobadosEnPagina}</p>
-            </div>
-            <div className="rounded-lg bg-green-50 dark:bg-green-900/30 p-3 text-green-600 dark:text-green-400">
-              <span className="material-symbols-outlined text-3xl">check_circle</span>
-            </div>
-          </div>
-        </div>
-
-        {userRole !== 'Direccion' && (
-          <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#617589] dark:text-slate-400">Rechazados (página actual)</p>
-                <p className="text-3xl font-black text-red-600 dark:text-red-400 mt-2">{rechazadosEnPagina}</p>
-              </div>
-              <div className="rounded-lg bg-red-50 dark:bg-red-900/30 p-3 text-red-600 dark:text-red-400">
-                <span className="material-symbols-outlined text-3xl">cancel</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Filtros */}
       <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">Buscar</label>
             <div className="relative">
@@ -196,28 +118,11 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
                 value={busqueda}
                 onChange={(e) => {
                   setBusqueda(e.target.value)
-                  handleFiltroChange()
                 }}
                 placeholder="Estación, usuario, ID..."
                 className="w-full pl-9 pr-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">Estado</label>
-            <select
-              value={filtroEstado}
-              onChange={(e) => {
-                setFiltroEstado(e.target.value as EstadoReporte | 'Todos')
-                handleFiltroChange()
-              }}
-              className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
-            >
-              <option value="Todos">Todos</option>
-              <option value={EstadoReporte.Aprobado}>Aprobado</option>
-              <option value={EstadoReporte.Rechazado}>Rechazado</option>
-            </select>
           </div>
 
           <div>
@@ -227,7 +132,6 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
               value={filtroFechaDesde}
               onChange={(e) => {
                 setFiltroFechaDesde(e.target.value)
-                handleFiltroChange()
               }}
               className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
             />
@@ -240,7 +144,6 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
               value={filtroFechaHasta}
               onChange={(e) => {
                 setFiltroFechaHasta(e.target.value)
-                handleFiltroChange()
               }}
               className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
             />
@@ -250,7 +153,6 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
         <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-[#e6e8eb] dark:border-slate-700">
           <button
             onClick={() => {
-              setFiltroEstado('Todos')
               setFiltroFechaDesde('')
               setFiltroFechaHasta('')
               setBusqueda('')
@@ -267,8 +169,7 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
       <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] shadow-sm overflow-hidden">
         <div className="px-6 py-5 border-b border-[#e6e8eb] dark:border-slate-700">
           <h3 className="text-lg font-bold text-[#111418] dark:text-white">
-            Reportes Procesados {pagination ? `(${pagination.total} total)` : ''}
-            {reportesFiltrados.length !== reportesBase.length && ` - ${reportesFiltrados.length} filtrados`}
+            Reportes {pagination ? `(${pagination.total} ${pagination.total === 1 ? 'reporte' : 'reportes'})` : ''}
           </h3>
         </div>
 
@@ -284,7 +185,7 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
             </p>
             <p className="text-sm">
               {reportes.length === 0
-                ? 'Los reportes aprobados o rechazados aparecerán aquí'
+                ? 'Los reportes capturados aparecerán aquí'
                 : 'Ajusta los filtros para ver más resultados'}
             </p>
           </div>
@@ -293,23 +194,34 @@ export default function VistaHistorial({ userRole, titulo = 'Historial de Report
             <TablaReportes
               reportes={reportesFiltrados}
               calcularTotalVentas={calcularTotalVentas}
-              getEstadoBadge={getEstadoBadge}
-              getEstadoIcon={getEstadoIcon}
               handleVerDetalle={handleVerDetalle}
               showAcciones={true}
+              showEstado={false}
+              showEditar={false}
               renderAcciones={(reporte) => (
                 <div className="flex items-center justify-end gap-2">
                   <button
                     onClick={() => handleVerDetalle(reporte)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1173d4] text-white text-sm font-bold hover:bg-blue-600 transition-colors shadow-sm hover:shadow-md"
+                    className="size-9 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                    title="Ver Detalle"
                   >
                     <span className="material-symbols-outlined text-lg">visibility</span>
-                    <span>Ver</span>
                   </button>
+                  
+                  {(userRole === 'Administrador' || userRole === 'GerenteEstacion' || userRole === 'GerenteZona') && (
+                    <button
+                      onClick={() => navigate(`/reportes/${reporte.id}/correccion`)}
+                      className="size-9 rounded-lg bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                      title="Corregir Reporte (Cascada)"
+                    >
+                      <span className="material-symbols-outlined text-lg">build</span>
+                    </button>
+                  )}
+
                   {onExportarExcel && (
                     <button
                       onClick={() => onExportarExcel(reporte)}
-                      className="size-9 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                      className="size-9 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/40 flex items-center justify-center transition-all hover:scale-105 active:scale-95"
                       title="Exportar a Excel"
                     >
                       <span className="material-symbols-outlined text-lg">download</span>

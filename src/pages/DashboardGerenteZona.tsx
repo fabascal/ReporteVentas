@@ -1,27 +1,32 @@
-import { useState, useMemo } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { reportesService } from '../services/reportesService'
-import { ReporteVentas, EstadoReporte } from '../types/reportes'
+import { ReporteVentas } from '../types/reportes'
 import { Role } from '../types/auth'
 import GerenteZonaHeader from '../components/GerenteZonaHeader'
-import DetalleReporteModal from '../components/DetalleReporteModal'
+import { CierreMensualModal } from '../components/CierreMensualModal'
 import VistaHistorial from '../components/views/VistaHistorial'
-import VistaRevision from '../components/views/VistaRevision'
 import VistaDashboard from '../components/views/VistaDashboard'
+import ControlFinancieroZona from '../components/ControlFinancieroZona'
 import { exportarReporteExcel } from '../utils/exportarExcel'
+import { obtenerControlFinanciero } from '../services/cierreMensualService'
 
 type VistaActiva = 'dashboard' | 'revision' | 'historial'
 
 export default function DashboardGerenteZona() {
   const { user } = useAuth()
-  const queryClient = useQueryClient()
+  const location = useLocation()
   const [vistaActiva, setVistaActiva] = useState<VistaActiva>('dashboard')
-  const [selectedReporte, setSelectedReporte] = useState<ReporteVentas | null>(null)
-  const [comentarios, setComentarios] = useState('')
-  const [showModal, setShowModal] = useState(false)
-  const [showDetalleModal, setShowDetalleModal] = useState(false)
-  const [reporteDetalle, setReporteDetalle] = useState<ReporteVentas | null>(null)
+  const [showCierreModal, setShowCierreModal] = useState(false)
+  
+  // Efecto para manejar el cambio de vista desde la navegación (state)
+  useEffect(() => {
+    if (location.state?.activeViewId) {
+      setVistaActiva(location.state.activeViewId as VistaActiva)
+    }
+  }, [location.state])
   
   // Filtro de fecha para el dashboard (por defecto, mes actual)
   const [fechaFiltro, setFechaFiltro] = useState<string>(() => {
@@ -29,14 +34,18 @@ export default function DashboardGerenteZona() {
     return hoy.toISOString().split('T')[0] // Formato YYYY-MM-DD (se convertirá a YYYY-MM-01 para el mes)
   })
 
+  // Calcular nombre del mes para el modal de cierre
+  const nombreMes = useMemo(() => {
+    const fechaSeleccionada = new Date(fechaFiltro + 'T12:00:00')
+    return fechaSeleccionada.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })
+  }, [fechaFiltro])
+
   const [page, setPage] = useState(1)
   const limit = 20
 
   // Obtener reportes con paginación según la vista activa
-  const estadoFiltro = vistaActiva === 'revision' ? 'EnRevision' : vistaActiva === 'historial' ? 'Aprobado,Rechazado' : undefined
-  
-  // Para el dashboard, necesitamos obtener todos los reportes aprobados (sin paginación)
-  // Para revision e historial, usamos paginación normal
+  // Para el dashboard, necesitamos obtener todos los reportes (sin paginación)
+  // Para revisión e historial, usamos paginación normal
   const { data: reportesData, isLoading } = useQuery({
     queryKey: ['reportes', vistaActiva, page, fechaFiltro],
     queryFn: () => {
@@ -44,47 +53,38 @@ export default function DashboardGerenteZona() {
         // Para dashboard, obtener todos los reportes aprobados sin paginación
         return reportesService.getReportes(1, 1000, 'Aprobado')
       }
-      return reportesService.getReportes(page, limit, estadoFiltro)
+      return reportesService.getReportes(page, limit, 'Aprobado')
     },
   })
 
   const todosReportes = reportesData?.data || []
   const pagination = reportesData?.pagination || { page: 1, limit, total: 0, totalPages: 1 }
 
-  // Filtrar reportes según la vista (ya viene filtrado del backend, pero por seguridad)
-  const reportes = useMemo(() => {
-    if (vistaActiva === 'revision') {
-      return todosReportes.filter((r) => r.estado === EstadoReporte.EnRevision)
-    } else if (vistaActiva === 'historial') {
-      return todosReportes.filter(
-        (r) => r.estado === EstadoReporte.Aprobado || r.estado === EstadoReporte.Rechazado
-      )
-    }
-    return todosReportes
-  }, [todosReportes, vistaActiva])
-
-  // Mutation para actualizar estado
-  const updateEstadoMutation = useMutation({
-    mutationFn: ({ id, estado, comentarios }: { id: string; estado: EstadoReporte; comentarios?: string }) =>
-      reportesService.updateEstado(id, { estado, comentarios }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reportes'] })
-      setShowModal(false)
-      setSelectedReporte(null)
-      setComentarios('')
-      setPage(1) // Resetear a página 1 después de actualizar
-    },
-  })
+  const reportes = useMemo(() => todosReportes, [todosReportes])
 
   const handleExportarExcel = (reporte: ReporteVentas) => {
     exportarReporteExcel(reporte)
   }
 
-  // Estadísticas para revisión
-  // Nota: El backend filtra reportes EnRevision, Aprobado y Rechazado para GerenteZona
-  const totalEnRevision = vistaActiva === 'revision' ? pagination.total : reportes.filter((r) => r.estado === EstadoReporte.EnRevision).length
-  const totalReportes = vistaActiva === 'revision' ? pagination.total : reportes.length
-
+  // Obtener control financiero para el mes seleccionado
+  // Usar zona_id directamente del usuario (GerenteZona) o zonas[0] para compatibilidad
+  const zonaId = user?.zona_id || user?.zonas?.[0]
+  
+  const { data: controlFinanciero, isLoading: isLoadingControl } = useQuery({
+    queryKey: ['control-financiero', zonaId, fechaFiltro],
+    queryFn: () => {
+      if (!zonaId) {
+        console.warn('[DashboardGerenteZona] No se encontró zona_id para el usuario:', user)
+        return null
+      }
+      const fecha = new Date(fechaFiltro + 'T12:00:00')
+      const anio = fecha.getFullYear()
+      const mes = fecha.getMonth() + 1
+      console.log('[DashboardGerenteZona] Obteniendo control financiero:', { zonaId, anio, mes })
+      return obtenerControlFinanciero(zonaId, anio, mes)
+    },
+    enabled: !!zonaId && vistaActiva === 'dashboard',
+  })
 
   // Datos para gráficas basados en la fecha seleccionada
   // Usar UTC para evitar problemas de zona horaria
@@ -195,24 +195,61 @@ export default function DashboardGerenteZona() {
     }))
   }, [reportesAcumulados])
 
-  // Datos para gráfica de ventas totales por ZONA (agrupado) - acumulado
-  const datosVentasPorZona = useMemo(() => {
-    const agrupados = reportesAcumulados.reduce((acc, r) => {
-      const zonaNombre = r.zonaNombre || 'Sin Zona'
-      if (!acc[zonaNombre]) {
-        acc[zonaNombre] = 0
-      }
-      acc[zonaNombre] += r.premium.importe + r.magna.importe + r.diesel.importe + (r.aceites || 0)
-      return acc
-    }, {} as Record<string, number>)
+  // Datos para gráfica de merma por ESTACIÓN (de la zona del gerente) - filtrado por mes
+  // IMPORTANTE: Mostrar E% (merma_porcentaje) - la pérdida por evaporación/fuga
+  const datosMermaPorEstacion = useMemo(() => {
+    const mesSeleccionado = fechaSeleccionada.getMonth()
+    const anoSeleccionado = fechaSeleccionada.getFullYear()
 
-    return Object.entries(agrupados)
-      .map(([zona, total]) => ({
-        zona,
-        'Total Ventas': parseFloat(total.toFixed(2)),
+    // Filtrar por mes seleccionado
+    const reportesFiltrados = reportesAcumulados.filter((r) => {
+      const reporteFecha = new Date(r.fecha)
+      return (
+        reporteFecha.getMonth() === mesSeleccionado &&
+        reporteFecha.getFullYear() === anoSeleccionado
+      )
+    })
+
+    // Agrupar por estación y calcular promedio de E% (merma_porcentaje)
+    const agrupados = reportesFiltrados.reduce((acc, r) => {
+      const estacionNombre = r.estacionNombre || 'Sin Estación'
+      if (!acc[estacionNombre]) {
+        acc[estacionNombre] = {
+          estacion: estacionNombre,
+          premiumTotal: 0,
+          premiumCount: 0,
+          magnaTotal: 0,
+          magnaCount: 0,
+          dieselTotal: 0,
+          dieselCount: 0,
+        }
+      }
+      // Acumular E% (merma_porcentaje) - siempre incluir, incluso si es 0
+      if (r.premium?.mermaPorcentaje !== undefined) {
+        acc[estacionNombre].premiumTotal += r.premium.mermaPorcentaje
+        acc[estacionNombre].premiumCount++
+      }
+      if (r.magna?.mermaPorcentaje !== undefined) {
+        acc[estacionNombre].magnaTotal += r.magna.mermaPorcentaje
+        acc[estacionNombre].magnaCount++
+      }
+      if (r.diesel?.mermaPorcentaje !== undefined) {
+        acc[estacionNombre].dieselTotal += r.diesel.mermaPorcentaje
+        acc[estacionNombre].dieselCount++
+      }
+      return acc
+    }, {} as Record<string, { estacion: string; premiumTotal: number; premiumCount: number; magnaTotal: number; magnaCount: number; dieselTotal: number; dieselCount: number }>)
+
+    // Calcular promedios y ordenar por merma total (mayor a menor)
+    return Object.values(agrupados)
+      .map((item) => ({
+        estacion: item.estacion,
+        Premium: item.premiumCount > 0 ? parseFloat((item.premiumTotal / item.premiumCount).toFixed(2)) : 0,
+        Magna: item.magnaCount > 0 ? parseFloat((item.magnaTotal / item.magnaCount).toFixed(2)) : 0,
+        Diesel: item.dieselCount > 0 ? parseFloat((item.dieselTotal / item.dieselCount).toFixed(2)) : 0,
       }))
-      .sort((a, b) => b['Total Ventas'] - a['Total Ventas'])
-  }, [reportesAcumulados])
+      .sort((a, b) => (b.Premium + b.Magna + b.Diesel) - (a.Premium + a.Magna + a.Diesel))
+  }, [reportesAcumulados, fechaSeleccionada])
 
   // Datos para gráfica de TOP 10 estaciones (solo las mejores) - acumulado
   const datosTopEstaciones = useMemo(() => {
@@ -269,66 +306,6 @@ export default function DashboardGerenteZona() {
   const totalGeneralAcumulado = totalesAcumulados.premium + totalesAcumulados.magna + totalesAcumulados.diesel + totalesAcumulados.aceites
   const totalGeneralDia = totalesDia.premium + totalesDia.magna + totalesDia.diesel + totalesDia.aceites
 
-  const handleVerDetalle = (reporte: ReporteVentas) => {
-    setSelectedReporte(reporte)
-    setComentarios(reporte.comentarios || '')
-    setShowModal(true)
-  }
-
-  const handleAprobar = () => {
-    if (selectedReporte) {
-      updateEstadoMutation.mutate({
-        id: selectedReporte.id,
-        estado: EstadoReporte.Aprobado,
-        comentarios: comentarios || undefined,
-      })
-    }
-  }
-
-  const handleRechazar = () => {
-    if (selectedReporte) {
-      updateEstadoMutation.mutate({
-        id: selectedReporte.id,
-        estado: EstadoReporte.Rechazado,
-        comentarios: comentarios || undefined,
-      })
-    }
-  }
-
-  const getEstadoBadge = (estado: EstadoReporte) => {
-    switch (estado) {
-      case EstadoReporte.Pendiente:
-        return 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400'
-      case EstadoReporte.EnRevision:
-        return 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
-      case EstadoReporte.Aprobado:
-        return 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-      case EstadoReporte.Rechazado:
-        return 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-      default:
-        return 'bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-400'
-    }
-  }
-
-  const getEstadoIcon = (estado: EstadoReporte) => {
-    switch (estado) {
-      case EstadoReporte.Pendiente:
-        return 'schedule'
-      case EstadoReporte.EnRevision:
-        return 'hourglass_empty'
-      case EstadoReporte.Aprobado:
-        return 'check_circle'
-      case EstadoReporte.Rechazado:
-        return 'cancel'
-      default:
-        return 'help'
-    }
-  }
-
-  const calcularTotalVentas = (reporte: ReporteVentas) => {
-    return reporte.premium.importe + reporte.magna.importe + reporte.diesel.importe + (reporte.aceites || 0)
-  }
-
   return (
     <div className="min-h-screen bg-[#f6f7f8] dark:bg-[#101922] font-display antialiased transition-colors duration-200">
       <GerenteZonaHeader vistaActiva={vistaActiva} onChangeVista={setVistaActiva} />
@@ -336,72 +313,66 @@ export default function DashboardGerenteZona() {
       {/* Main Content */}
       <main className="flex-1 px-4 py-8 md:px-8 lg:px-12 xl:px-16 max-w-[1600px] mx-auto w-full">
         {vistaActiva === 'dashboard' && (
-        <VistaDashboard
-            totalesAcumulados={totalesAcumulados}
-            totalesDia={totalesDia}
-            totalGeneralAcumulado={totalGeneralAcumulado}
-            totalGeneralDia={totalGeneralDia}
-          datosPreciosPorDia={datosPreciosPorDia}
-          datosLitrosPorZona={datosLitrosPorZona}
-          datosVentasPorZona={datosVentasPorZona}
-          datosTopEstaciones={datosTopEstaciones}
-            fechaFiltro={fechaFiltro}
-            setFechaFiltro={setFechaFiltro}
-            reportesAcumulados={reportesAcumulados}
-            reportesDiaSeleccionado={reportesDiaSeleccionado}
-        />
+          <>
+            <VistaDashboard
+              totalesAcumulados={totalesAcumulados}
+              totalesDia={totalesDia}
+              totalGeneralAcumulado={totalGeneralAcumulado}
+              totalGeneralDia={totalGeneralDia}
+              datosPreciosPorDia={datosPreciosPorDia}
+              datosLitrosPorZona={datosLitrosPorZona}
+              datosMermaPorEstacion={datosMermaPorEstacion}
+              datosTopEstaciones={datosTopEstaciones}
+              fechaFiltro={fechaFiltro}
+              setFechaFiltro={setFechaFiltro}
+              reportesAcumulados={reportesAcumulados}
+              reportesDiaSeleccionado={reportesDiaSeleccionado}
+              onOpenCierre={() => setShowCierreModal(true)}
+            />
+            
+            {/* Control Financiero */}
+            <div className="mt-8">
+              <ControlFinancieroZona
+                controlFinanciero={controlFinanciero || null}
+                isLoading={isLoadingControl}
+                zonaNombre={user?.name || 'Zona'}
+                mesNombre={nombreMes}
+              />
+            </div>
+          </>
         )}
 
         {vistaActiva === 'revision' && (
-          <VistaRevision
-            reportes={reportes}
-            isLoading={isLoading}
-            totalEnRevision={totalEnRevision}
-            totalReportes={totalReportes}
-            getEstadoBadge={getEstadoBadge}
-            getEstadoIcon={getEstadoIcon}
-            calcularTotalVentas={calcularTotalVentas}
-            handleVerDetalle={handleVerDetalle}
+          <VistaHistorial
+            userRole={user?.role || Role.GerenteZona}
+            titulo="Reportes de Zona"
+            descripcion="Reportes aprobados por el gerente de estación"
+            estadoFiltro="Aprobado"
             onExportarExcel={handleExportarExcel}
-            pagination={pagination}
-            onPageChange={setPage}
           />
         )}
 
         {vistaActiva === 'historial' && (
-          <VistaHistorial userRole={user?.role || Role.GerenteZona} onExportarExcel={handleExportarExcel} />
+          <VistaHistorial
+            userRole={user?.role || Role.GerenteZona}
+            estadoFiltro="Aprobado"
+            onExportarExcel={handleExportarExcel}
+          />
         )}
       </main>
 
-      {/* Modal de Revisión */}
-      {showModal && selectedReporte && (
-        <ModalRevision
-          selectedReporte={selectedReporte}
-          comentarios={comentarios}
-          setComentarios={setComentarios}
-          updateEstadoMutation={updateEstadoMutation}
-          onClose={() => {
-            setShowModal(false)
-            setSelectedReporte(null)
-            setComentarios('')
-          }}
-          handleAprobar={handleAprobar}
-          handleRechazar={handleRechazar}
-          calcularTotalVentas={calcularTotalVentas}
+      {/* Modal de Cierre Mensual */}
+      {showCierreModal && zonaId && (
+        <CierreMensualModal
+          isOpen={showCierreModal}
+          onClose={() => setShowCierreModal(false)}
+          zonaId={zonaId}
+          zonaNombre={user?.name || 'Zona'}
+          anio={parseInt(fechaFiltro.split('-')[0])}
+          mes={parseInt(fechaFiltro.split('-')[1])}
+          mesNombre={nombreMes}
         />
       )}
-
-      {/* Modal de Detalle (para historial) */}
-      {showDetalleModal && reporteDetalle && (
-        <DetalleReporteModal
-          reporte={reporteDetalle}
-          onClose={() => {
-            setShowDetalleModal(false)
-            setReporteDetalle(null)
-          }}
-          titulo={`Detalle del Reporte - ${reporteDetalle.estacionNombre}`}
-        />
-          )}
         </div>
   )
 }
@@ -428,6 +399,36 @@ function ModalRevision({
   handleRechazar: () => void
   calcularTotalVentas: (reporte: ReporteVentas) => number
 }) {
+  const obtenerMetricasEficiencia = (producto: any) => {
+    const litros = producto?.litros || 0
+    const mermaVolumen = producto?.mermaVolumen || 0
+    const volumenNeto = litros - mermaVolumen
+    const eficienciaReal =
+      typeof producto?.eficienciaReal === 'number'
+        ? producto.eficienciaReal
+        : (producto?.iffb || 0) - (producto?.if || 0)
+    const eficienciaImporte =
+      typeof producto?.eficienciaImporte === 'number'
+        ? producto.eficienciaImporte
+        : eficienciaReal * (producto?.precio || 0)
+    const eficienciaRealPorcentaje =
+      typeof producto?.eficienciaRealPorcentaje === 'number'
+        ? producto.eficienciaRealPorcentaje
+        : litros > 0
+        ? (eficienciaReal / litros) * 100
+        : 0
+    const diferencia = eficienciaReal - mermaVolumen
+    const diferenciaPorcentaje = volumenNeto > 0 ? (diferencia / volumenNeto) * 100 : 0
+
+    return {
+      eficienciaReal,
+      eficienciaImporte,
+      eficienciaRealPorcentaje,
+      diferencia,
+      diferenciaPorcentaje,
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/30 backdrop-blur-sm dark:bg-black/50">
       <div className="bg-white dark:bg-[#1a2632] rounded-xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-[#e6e8eb] dark:border-slate-700">
@@ -523,6 +524,107 @@ function ModalRevision({
                       </div>
                     </div>
                   )}
+                  {(() => {
+                    const {
+                      eficienciaReal,
+                      eficienciaImporte,
+                      eficienciaRealPorcentaje,
+                      diferencia,
+                      diferenciaPorcentaje,
+                    } = obtenerMetricasEficiencia(selectedReporte.premium)
+                    return (
+                      <div className="col-span-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-2">Eficiencia Real</p>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">Volumen (IFFB - IF)</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {eficienciaReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">Importe</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              ${eficienciaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">Porcentaje</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {eficienciaRealPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">+</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {diferencia.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">%</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {diferenciaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  <div className="col-span-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+                    <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Inventario y Compras</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">I.I.B.</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.iib || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">Compras (C)</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.compras || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">CCT</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.cct || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">V. Dsc</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.vDsc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">DC</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.dc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">Dif V. Dsc</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.difVDsc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">I.F.</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.if || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">I.F.F.B.</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.premium.iffb || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
               </div>
             </div>
 
@@ -579,6 +681,107 @@ function ModalRevision({
                       </div>
                     </div>
                   )}
+                  {(() => {
+                    const {
+                      eficienciaReal,
+                      eficienciaImporte,
+                      eficienciaRealPorcentaje,
+                      diferencia,
+                      diferenciaPorcentaje,
+                    } = obtenerMetricasEficiencia(selectedReporte.magna)
+                    return (
+                      <div className="col-span-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                        <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-2">Eficiencia Real</p>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">Volumen (IFFB - IF)</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {eficienciaReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">Importe</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              ${eficienciaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">Porcentaje</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {eficienciaRealPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                            </p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">+</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {diferencia.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[#617589] dark:text-slate-400">%</p>
+                            <p className="font-semibold text-[#111418] dark:text-white">
+                              {diferenciaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
+                  <div className="col-span-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+                    <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Inventario y Compras</p>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">I.I.B.</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.iib || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">Compras (C)</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.compras || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">CCT</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.cct || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">V. Dsc</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.vDsc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">DC</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.dc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">Dif V. Dsc</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.difVDsc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">I.F.</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.if || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[#617589] dark:text-slate-400">I.F.F.B.</p>
+                        <p className="font-semibold text-[#111418] dark:text-white">
+                          {(selectedReporte.magna.iffb || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                   </div>
                 </div>
 
@@ -635,6 +838,107 @@ function ModalRevision({
                     </div>
                   </div>
                 )}
+                {(() => {
+                  const {
+                    eficienciaReal,
+                    eficienciaImporte,
+                    eficienciaRealPorcentaje,
+                    diferencia,
+                    diferenciaPorcentaje,
+                  } = obtenerMetricasEficiencia(selectedReporte.diesel)
+                  return (
+                    <div className="col-span-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                      <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-2">Eficiencia Real</p>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <p className="text-[#617589] dark:text-slate-400">Volumen (IFFB - IF)</p>
+                          <p className="font-semibold text-[#111418] dark:text-white">
+                            {eficienciaReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[#617589] dark:text-slate-400">Importe</p>
+                          <p className="font-semibold text-[#111418] dark:text-white">
+                            ${eficienciaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[#617589] dark:text-slate-400">Porcentaje</p>
+                          <p className="font-semibold text-[#111418] dark:text-white">
+                            {eficienciaRealPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+                        <div>
+                          <p className="text-[#617589] dark:text-slate-400">+</p>
+                          <p className="font-semibold text-[#111418] dark:text-white">
+                            {diferencia.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[#617589] dark:text-slate-400">%</p>
+                          <p className="font-semibold text-[#111418] dark:text-white">
+                            {diferenciaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+                <div className="col-span-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+                  <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-2">Inventario y Compras</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">I.I.B.</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.iib || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Compras (C)</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.compras || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">CCT</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.cct || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">V. Dsc</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.vDsc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">DC</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.dc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">Dif V. Dsc</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.difVDsc || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">I.F.</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.if || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[#617589] dark:text-slate-400">I.F.F.B.</p>
+                      <p className="font-semibold text-[#111418] dark:text-white">
+                        {(selectedReporte.diesel.iffb || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 

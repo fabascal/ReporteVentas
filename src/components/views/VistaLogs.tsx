@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { reportesService } from '../../services/reportesService'
 import Paginacion from '../Paginacion'
 import { useState } from 'react'
+import { formatFechaHora, formatFechaSolo } from '../../utils/dateUtils'
 
 interface LogEntry {
   id: string
@@ -16,6 +17,7 @@ interface LogEntry {
   fechaCambio: string
   estacionId?: string
   estacionNombre?: string
+  reporteFecha?: string
 }
 
 interface VistaLogsProps {
@@ -99,16 +101,7 @@ export default function VistaLogs({
     }
   }
 
-  const formatFecha = (fecha: string) => {
-    return new Date(fecha).toLocaleString('es-MX', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  }
+  // Usar funciones utilitarias para formatear fechas con conversión correcta de UTC a zona horaria local
 
   return (
     <>
@@ -279,6 +272,9 @@ export default function VistaLogs({
                       Estación
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                      Fecha Reporte
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
                       Campo
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
@@ -293,7 +289,7 @@ export default function VistaLogs({
                       className="hover:bg-[#f6f7f8] dark:hover:bg-[#101922] transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
-                        {formatFecha(log.fechaCambio)}
+                        {formatFechaHora(log.fechaCambio)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
                         {log.usuarioNombre || 'N/A'}
@@ -312,6 +308,9 @@ export default function VistaLogs({
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
                         {log.estacionNombre || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
+                        {formatFechaSolo(log.reporteFecha)}
                       </td>
                       <td className="px-6 py-4 text-sm text-[#111418] dark:text-white">
                         {log.campoModificado ? (

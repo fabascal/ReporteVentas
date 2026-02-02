@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { reportesService } from '../services/reportesService'
 import { ReporteVentas, EstadoReporte } from '../types/reportes'
@@ -16,6 +17,7 @@ import { exportarReporteExcel } from '../utils/exportarExcel'
 export default function DashboardGerenteEstacion() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const location = useLocation()
   const [vistaActiva, setVistaActiva] = useState<VistaActivaGerenteEstacion>('dashboard')
   const [selectedReporte, setSelectedReporte] = useState<ReporteVentas | null>(null)
   const [showDetalleModal, setShowDetalleModal] = useState(false)
@@ -23,37 +25,43 @@ export default function DashboardGerenteEstacion() {
   const [showEstadoModal, setShowEstadoModal] = useState(false)
   const [comentarios, setComentarios] = useState('')
   
+  // Efecto para manejar el cambio de vista desde la navegación (state)
+  useEffect(() => {
+    if (location.state?.activeViewId) {
+      setVistaActiva(location.state.activeViewId as VistaActivaGerenteEstacion)
+    }
+  }, [location.state])
+  
   // Filtros
   const [filtroEstado, setFiltroEstado] = useState<EstadoReporte | 'Todos'>('Todos')
-  const [filtroEstacion, setFiltroEstacion] = useState<string>('Todas')
+  const [filtroEstacion, setFiltroEstacion] = useState<string>('')
   const [page, setPage] = useState(1)
   const limit = 20
 
   // Obtener reportes con paginación según la vista activa
-  const estadoFiltro = vistaActiva === 'historial' ? 'Aprobado,Rechazado' : vistaActiva === 'reportes' ? 'Pendiente,EnRevision' : undefined
-  
+  let estadoFiltroBackend: string | undefined = undefined
+  if (vistaActiva === 'historial') {
+    estadoFiltroBackend = 'Aprobado,Rechazado'
+  } else if (vistaActiva === 'reportes') {
+    estadoFiltroBackend = 'Pendiente'
+  }
+
+  const estadoFiltroFinal = filtroEstado !== 'Todos' ? filtroEstado : estadoFiltroBackend
+
   const { data: reportesData, isLoading } = useQuery({
-    queryKey: ['reportes', vistaActiva, page],
-    queryFn: () => reportesService.getReportes(page, limit, estadoFiltro),
+    queryKey: ['reportes', vistaActiva, page, estadoFiltroFinal, filtroEstacion],
+    queryFn: () => reportesService.getReportes(
+      page, 
+      limit, 
+      estadoFiltroFinal,
+      undefined,
+      filtroEstacion || undefined
+    ),
     enabled: vistaActiva !== 'nuevaCaptura',
   })
 
-  const todosReportes = reportesData?.data || []
+  const reportes = reportesData?.data || []
   const pagination = reportesData?.pagination || { page: 1, limit, total: 0, totalPages: 1 }
-
-  // Filtrar reportes según la vista activa (ya viene filtrado del backend, pero por seguridad)
-  const reportes = useMemo(() => {
-    if (vistaActiva === 'historial') {
-      return todosReportes.filter(
-        (r) => r.estado === EstadoReporte.Aprobado || r.estado === EstadoReporte.Rechazado
-      )
-    } else if (vistaActiva === 'reportes') {
-      return todosReportes.filter(
-        (r) => r.estado === EstadoReporte.Pendiente || r.estado === EstadoReporte.EnRevision
-      )
-    }
-    return []
-  }, [todosReportes, vistaActiva])
 
   // Obtener estaciones asignadas (el backend ya filtra según el usuario y rol)
   // Para GerenteEstacion, solo devuelve las estaciones asignadas al usuario
@@ -62,14 +70,13 @@ export default function DashboardGerenteEstacion() {
     queryFn: reportesService.getEstaciones,
   })
 
-  // Filtrar estaciones para mostrar solo las que tienen reportes
-  // Esto asegura que el dropdown solo muestre estaciones relevantes
-  const estaciones = todasEstaciones.filter((estacion) =>
-    reportes.some((reporte) => reporte.estacionId === estacion.id)
-  )
+  // Obtener todas las estaciones asignadas (sin filtrar por reportes, para que el dropdown siempre funcione)
+  const estaciones = todasEstaciones
 
+  // Los reportes ya vienen filtrados del backend, no necesitamos filtrar en el frontend
+  const reportesFiltrados = reportes
 
-  // Mutation para actualizar estado
+  // Mutation para actualizar estado (autorizar)
   const updateEstadoMutation = useMutation({
     mutationFn: ({ id, estado, comentarios }: { id: string; estado: EstadoReporte; comentarios?: string }) =>
       reportesService.updateEstado(id, { estado, comentarios }),
@@ -78,9 +85,28 @@ export default function DashboardGerenteEstacion() {
       setShowEstadoModal(false)
       setSelectedReporte(null)
       setComentarios('')
-      setPage(1) // Resetear a página 1 después de actualizar
+      setPage(1)
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.response?.data?.message || 'Error al actualizar el estado del reporte'
+      alert(errorMessage)
     },
   })
+
+  // Usar estadísticas del backend (totales globales, no solo de la página actual)
+  const totalReportes = pagination.total
+
+  const handleVerDetalle = (reporte: ReporteVentas) => {
+    setSelectedReporte(reporte)
+    setShowDetalleModal(true)
+  }
+
+  const handleEditar = (reporte: ReporteVentas) => {
+    if (reporte.estado === EstadoReporte.Pendiente) {
+      setSelectedReporte(reporte)
+      setShowEditModal(true)
+    }
+  }
 
   const handleAprobarRechazar = (reporte: ReporteVentas) => {
     setSelectedReporte(reporte)
@@ -95,52 +121,6 @@ export default function DashboardGerenteEstacion() {
         comentarios: comentarios || undefined,
       })
     }
-  }
-
-  // Filtrar reportes según los filtros seleccionados
-  const reportesFiltrados = reportes.filter((reporte) => {
-    // Filtro por estado
-    if (filtroEstado !== 'Todos' && reporte.estado !== filtroEstado) {
-      return false
-    }
-    // Filtro por estación
-    if (filtroEstacion !== 'Todas' && reporte.estacionId !== filtroEstacion) {
-      return false
-    }
-    return true
-  })
-
-  // Estadísticas para vista de reportes (Pendientes y EnRevision)
-  // Nota: Con paginación, solo tenemos los reportes de la página actual
-  // Las estadísticas se calculan sobre los reportes visibles
-  const reportesActivos = reportes.filter(
-    (r) => r.estado === EstadoReporte.Pendiente || r.estado === EstadoReporte.EnRevision
-  )
-  const totalReportes = pagination.total // Usar el total de la paginación
-  const reportesPendientes = reportesActivos.filter((r) => r.estado === EstadoReporte.Pendiente).length
-  const reportesEnRevision = reportesActivos.filter((r) => r.estado === EstadoReporte.EnRevision).length
-  const reportesRechazados = reportesActivos.filter((r) => r.estado === EstadoReporte.Rechazado).length
-
-  // Estadísticas para vista de historial
-
-  const handleVerDetalle = (reporte: ReporteVentas) => {
-    setSelectedReporte(reporte)
-    setShowDetalleModal(true)
-  }
-
-  const handleEditar = (reporte: ReporteVentas) => {
-    if (reporte.estado === EstadoReporte.Pendiente) {
-      setSelectedReporte(reporte)
-      setShowEditModal(true)
-    }
-  }
-
-  const handleExportarExcel = (reporte: ReporteVentas) => {
-    exportarReporteExcel(reporte)
-  }
-
-  const calcularTotalVentas = (r: ReporteVentas) => {
-    return (r.premium.importe || 0) + (r.magna.importe || 0) + (r.diesel.importe || 0) + (r.aceites || 0)
   }
 
   const getEstadoBadge = (estado: EstadoReporte) => {
@@ -171,6 +151,14 @@ export default function DashboardGerenteEstacion() {
       default:
         return 'help'
     }
+  }
+
+  const handleExportarExcel = (reporte: ReporteVentas) => {
+    exportarReporteExcel(reporte)
+  }
+
+  const calcularTotalVentas = (r: ReporteVentas) => {
+    return (r.premium.importe || 0) + (r.magna.importe || 0) + (r.diesel.importe || 0) + (r.aceites || 0)
   }
 
 
@@ -214,20 +202,24 @@ export default function DashboardGerenteEstacion() {
             />
           </div>
         ) : vistaActiva === 'historial' ? (
-          <VistaHistorial userRole={user?.role || Role.GerenteEstacion} onExportarExcel={handleExportarExcel} />
+          <VistaHistorial
+            userRole={user?.role || Role.GerenteEstacion}
+            estadoFiltro="Aprobado,Rechazado"
+            onExportarExcel={handleExportarExcel}
+          />
         ) : (
           <VistaReportes
             reportes={reportes}
             reportesFiltrados={reportesFiltrados}
             isLoading={isLoading}
             totalReportes={pagination.total}
-            reportesPendientes={reportesPendientes}
-            reportesEnRevision={reportesEnRevision}
-            reportesRechazados={reportesRechazados}
+            reportesPendientes={reportesData?.stats?.pendientes || 0}
+            reportesEnRevision={reportesData?.stats?.enRevision || 0}
+            reportesRechazados={reportesData?.stats?.rechazados || 0}
             filtroEstado={filtroEstado}
             setFiltroEstado={(estado) => {
               setFiltroEstado(estado)
-              setPage(1) // Resetear a página 1 al cambiar filtro
+              setPage(1)
             }}
             filtroEstacion={filtroEstacion}
             setFiltroEstacion={(estacion) => {
@@ -336,7 +328,7 @@ export default function DashboardGerenteEstacion() {
 
               <div className="flex gap-3 pt-4">
                 <button
-                  onClick={() => handleConfirmarEstado(EstadoReporte.EnRevision)}
+                  onClick={() => handleConfirmarEstado(EstadoReporte.Aprobado)}
                   disabled={updateEstadoMutation.isPending}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
@@ -367,6 +359,7 @@ export default function DashboardGerenteEstacion() {
           </div>
         </div>
       )}
+
     </div>
   )
 }

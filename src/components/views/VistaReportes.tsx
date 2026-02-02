@@ -130,6 +130,7 @@ const VistaReportes: React.FC<VistaReportesProps> = ({
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Filtros */}
@@ -146,7 +147,7 @@ const VistaReportes: React.FC<VistaReportesProps> = ({
             >
               <option value="Todos">Todos</option>
               <option value={EstadoReporte.Pendiente}>Pendientes</option>
-              <option value={EstadoReporte.EnRevision}>En Revisión</option>
+              <option value={EstadoReporte.Aprobado}>Aprobados</option>
               <option value={EstadoReporte.Rechazado}>Rechazados</option>
             </select>
           </div>
@@ -160,7 +161,7 @@ const VistaReportes: React.FC<VistaReportesProps> = ({
               onChange={(e) => setFiltroEstacion(e.target.value)}
               className="px-4 py-2 rounded-lg border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1173d4] focus:border-transparent min-w-[200px]"
             >
-              <option value="Todas">Todas las estaciones</option>
+              <option value="">Todas las estaciones</option>
               {estaciones.map((estacion) => (
                 <option key={estacion.id} value={estacion.id}>
                   {estacion.nombre}
@@ -208,7 +209,7 @@ const VistaReportes: React.FC<VistaReportesProps> = ({
             <button
               onClick={() => {
                 setFiltroEstado('Todos')
-                setFiltroEstacion('Todas')
+                setFiltroEstacion('')
               }}
               className="inline-flex items-center gap-2 rounded-lg bg-[#1173d4] px-5 py-2.5 text-sm font-bold text-white shadow-md hover:bg-blue-600 transition-all hover:shadow-lg"
             >
@@ -225,6 +226,7 @@ const VistaReportes: React.FC<VistaReportesProps> = ({
               getEstadoIcon={getEstadoIcon}
               handleVerDetalle={handleVerDetalle}
               showAcciones={true}
+              showEstado={true}
               renderAcciones={(reporte) => (
                 <div className="flex items-center justify-end gap-2">
                   <button

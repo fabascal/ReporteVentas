@@ -10,8 +10,9 @@ export interface User {
   email: string
   name: string
   role: Role
-  estaciones?: string[] // IDs de estaciones asignadas
-  zonas?: string[] // IDs de zonas asignadas
+  zona_id?: string // ID de zona asignada (GerenteZona)
+  estaciones?: string[] // IDs de estaciones asignadas (GerenteEstacion)
+  zonas?: string[] // IDs de zonas asignadas (para compatibilidad legacy)
 }
 
 export interface AuthState {

@@ -1,165 +1,340 @@
 import { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { authenticator } from 'otplib'
+import qrcode from 'qrcode'
 import { pool } from '../config/database.js'
-import { Role, User } from '../types/auth.js'
 import { AuthRequest } from '../middleware/auth.middleware.js'
 
-const jwtSecret = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
 
 export const authController = {
-  async login(req: Request, res: Response) {
+  login: async (req: Request, res: Response) => {
+    const { email, password } = req.body
+
     try {
-      const { email, password } = req.body
-
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Email y contraseña son requeridos' })
-      }
-
+      // Buscar usuario
       const result = await pool.query(
-        'SELECT * FROM users WHERE email = $1',
+        'SELECT u.*, r.codigo as role_code FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.email = $1',
         [email]
       )
 
       if (result.rows.length === 0) {
-        return res.status(401).json({ message: 'Credenciales inválidas' })
+        return res.status(401).json({ error: 'Credenciales inválidas' })
       }
 
       const user = result.rows[0]
 
       // Verificar contraseña
-      if (!user.password_hash) {
-        return res.status(401).json({ message: 'Este usuario requiere autenticación OAuth' })
+      const validPassword = await bcrypt.compare(password, user.password_hash)
+      if (!validPassword) {
+        return res.status(401).json({ error: 'Credenciales inválidas' })
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password_hash)
-
-      if (!isValidPassword) {
-        return res.status(401).json({ message: 'Credenciales inválidas' })
+      // Si 2FA está habilitado, no devolver token aún, indicar que se requiere 2FA
+      if (user.two_factor_enabled) {
+        return res.json({
+          require2FA: true,
+          userId: user.id, // Enviar ID temporalmente para el siguiente paso (o usar un token temporal limitado)
+          email: user.email // Opcional, para mostrar al usuario
+        })
       }
 
-      // Obtener el rol desde la tabla roles (usar role_id si existe, sino usar role como fallback)
-      let roleCodigo: string = user.role || ''
-      if (user.role_id) {
-        const roleResult = await pool.query(
-          'SELECT codigo FROM roles WHERE id = $1 AND activo = true',
-          [user.role_id]
+      // Obtener zonas del usuario si es Gerente de Zona
+      let zona_id = undefined
+      if (user.role_code === 'GerenteZona') {
+        const zonasResult = await pool.query(
+          'SELECT zona_id FROM user_zonas WHERE user_id = $1 LIMIT 1',
+          [user.id]
         )
-        if (roleResult.rows.length > 0) {
-          roleCodigo = roleResult.rows[0].codigo
+        if (zonasResult.rows.length > 0) {
+          zona_id = zonasResult.rows[0].zona_id
         }
       }
+      
+      // Obtener estaciones del usuario si es Gerente de Estación
+      let estaciones = []
+      if (user.role_code === 'GerenteEstacion') {
+        const estacionesResult = await pool.query(
+          'SELECT estacion_id FROM user_estaciones WHERE user_id = $1',
+          [user.id]
+        )
+        estaciones = estacionesResult.rows.map(row => row.estacion_id)
+      }
 
-      // Obtener estaciones y zonas asignadas
-      const estacionesResult = await pool.query(
-        'SELECT estacion_id FROM user_estaciones WHERE user_id = $1',
-        [user.id]
-      )
-      const zonasResult = await pool.query(
-        'SELECT zona_id FROM user_zonas WHERE user_id = $1',
-        [user.id]
+      // Generar token
+      const token = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          role: user.role_code || user.role,
+          name: user.name,
+          zona_id: zona_id,
+          estaciones: estaciones
+        },
+        process.env.JWT_SECRET || 'your-secret-key', // Ensure using env var if available
+        { expiresIn: '24h' }
       )
 
-      const userData: User = {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: roleCodigo as Role,
-        estaciones: estacionesResult.rows.map((r) => r.estacion_id),
-        zonas: zonasResult.rows.map((r) => r.zona_id),
+      // Devolver respuesta
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role_code || user.role,
+          zona_id: zona_id,
+          estaciones: estaciones
+        }
+      })
+    } catch (error) {
+      console.error('Error en login:', error)
+      res.status(500).json({ error: 'Error interno del servidor' })
+    }
+  },
+
+  verify2FALogin: async (req: Request, res: Response) => {
+    const { userId, token: userToken } = req.body
+
+    try {
+      const result = await pool.query(
+        'SELECT u.*, r.codigo as role_code FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = $1',
+        [userId]
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' })
+      }
+
+      const user = result.rows[0]
+
+      if (!user.two_factor_enabled || !user.two_factor_secret) {
+        return res.status(400).json({ error: '2FA no está habilitado para este usuario' })
+      }
+
+      const isValid = authenticator.verify({
+        token: userToken,
+        secret: user.two_factor_secret
+      })
+
+      if (!isValid) {
+        return res.status(401).json({ error: 'Código 2FA inválido' })
+      }
+
+      // Generar token igual que en login
+      let zona_id = undefined
+      if (user.role_code === 'GerenteZona') {
+        const zonasResult = await pool.query(
+          'SELECT zona_id FROM user_zonas WHERE user_id = $1 LIMIT 1',
+          [user.id]
+        )
+        if (zonasResult.rows.length > 0) {
+          zona_id = zonasResult.rows[0].zona_id
+        }
+      }
+      
+      let estaciones = []
+      if (user.role_code === 'GerenteEstacion') {
+        const estacionesResult = await pool.query(
+          'SELECT estacion_id FROM user_estaciones WHERE user_id = $1',
+          [user.id]
+        )
+        estaciones = estacionesResult.rows.map(row => row.estacion_id)
       }
 
       const token = jwt.sign(
         {
           id: user.id,
           email: user.email,
-          role: user.role,
+          role: user.role_code || user.role,
+          name: user.name,
+          zona_id: zona_id,
+          estaciones: estaciones
         },
-        jwtSecret,
-        { expiresIn: '7d' }
+        process.env.JWT_SECRET || 'your-secret-key',
+        { expiresIn: '24h' }
       )
 
       res.json({
         token,
-        user: userData,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role_code || user.role,
+          zona_id: zona_id,
+          estaciones: estaciones
+        }
       })
+
     } catch (error) {
-      console.error('Error en login:', error)
-      res.status(500).json({ message: 'Error interno del servidor' })
+      console.error('Error verificando 2FA login:', error)
+      res.status(500).json({ error: 'Error interno del servidor' })
     }
   },
 
-  async getCurrentUser(req: AuthRequest, res: Response) {
+  getCurrentUser: async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
-        return res.status(401).json({ message: 'No autenticado' })
+        return res.status(401).json({ error: 'No autenticado' })
       }
 
-      const result = await pool.query('SELECT * FROM users WHERE id = $1', [
-        req.user.id,
-      ])
+      const result = await pool.query(
+        'SELECT u.id, u.email, u.name, r.codigo as role FROM users u LEFT JOIN roles r ON u.role_id = r.id WHERE u.id = $1',
+        [req.user.id]
+      )
 
       if (result.rows.length === 0) {
-        return res.status(404).json({ message: 'Usuario no encontrado' })
+        return res.status(404).json({ error: 'Usuario no encontrado' })
       }
 
       const user = result.rows[0]
-
-      // Obtener el rol desde la tabla roles (usar role_id si existe, sino usar role como fallback)
-      let roleCodigo: string = user.role || ''
-      if (user.role_id) {
-        const roleResult = await pool.query(
-          'SELECT codigo FROM roles WHERE id = $1 AND activo = true',
-          [user.role_id]
+      
+      // Obtener datos adicionales según rol
+      let zona_id = undefined
+      let estaciones = []
+      
+      if (user.role === 'GerenteZona') {
+        const zonasResult = await pool.query(
+          'SELECT zona_id FROM user_zonas WHERE user_id = $1 LIMIT 1',
+          [user.id]
         )
-        if (roleResult.rows.length > 0) {
-          roleCodigo = roleResult.rows[0].codigo
+        if (zonasResult.rows.length > 0) {
+          zona_id = zonasResult.rows[0].zona_id
         }
+      } else if (user.role === 'GerenteEstacion') {
+        const estacionesResult = await pool.query(
+          'SELECT estacion_id FROM user_estaciones WHERE user_id = $1',
+          [user.id]
+        )
+        estaciones = estacionesResult.rows.map(row => row.estacion_id)
       }
 
-      const estacionesResult = await pool.query(
-        'SELECT estacion_id FROM user_estaciones WHERE user_id = $1',
-        [user.id]
-      )
-      const zonasResult = await pool.query(
-        'SELECT zona_id FROM user_zonas WHERE user_id = $1',
-        [user.id]
-      )
-
-      const userData: User = {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: roleCodigo as Role,
-        estaciones: estacionesResult.rows.map((r) => r.estacion_id),
-        zonas: zonasResult.rows.map((r) => r.zona_id),
-      }
-
-      res.json(userData)
+      res.json({
+        ...user,
+        zona_id,
+        estaciones
+      })
     } catch (error) {
-      console.error('Error al obtener usuario:', error)
-      res.status(500).json({ message: 'Error interno del servidor' })
+      console.error('Error getting current user:', error)
+      res.status(500).json({ error: 'Error interno del servidor' })
     }
   },
 
-  async googleAuth(req: Request, res: Response) {
-    // Implementar OAuth con Google
-    res.redirect('/api/auth/google/callback')
+  get2FAStatus: async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'No autenticado' })
+
+      const result = await pool.query(
+        'SELECT two_factor_enabled FROM users WHERE id = $1',
+        [req.user.id]
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' })
+      }
+
+      res.json({ enabled: result.rows[0].two_factor_enabled || false })
+    } catch (error) {
+      console.error('Error getting 2FA status:', error)
+      res.status(500).json({ error: 'Error interno del servidor' })
+    }
   },
 
-  async googleCallback(req: Request, res: Response) {
-    // Implementar callback de Google OAuth
-    res.json({ message: 'Google OAuth callback - Implementar' })
+  setup2FA: async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'No autenticado' })
+
+      const secret = authenticator.generateSecret()
+      const otpauth = authenticator.keyuri(req.user.email, 'RepVtas', secret)
+      const imageUrl = await qrcode.toDataURL(otpauth)
+
+      // Guardar el secreto temporalmente (o en DB pero no habilitado aún)
+      await pool.query(
+        'UPDATE users SET two_factor_secret = $1, two_factor_enabled = false WHERE id = $2',
+        [secret, req.user.id]
+      )
+
+      res.json({ secret, qrCodeUrl: imageUrl })
+    } catch (error) {
+      console.error('Error setting up 2FA:', error)
+      res.status(500).json({ error: 'Error interno del servidor' })
+    }
   },
 
-  async githubAuth(req: Request, res: Response) {
-    // Implementar OAuth con GitHub
-    res.redirect('/api/auth/github/callback')
+  confirm2FA: async (req: AuthRequest, res: Response) => {
+    const { token } = req.body
+    
+    try {
+      if (!req.user) return res.status(401).json({ error: 'No autenticado' })
+
+      const result = await pool.query(
+        'SELECT two_factor_secret FROM users WHERE id = $1',
+        [req.user.id]
+      )
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' })
+      }
+
+      const secret = result.rows[0].two_factor_secret
+      if (!secret) {
+        return res.status(400).json({ error: 'No se ha iniciado la configuración de 2FA' })
+      }
+
+      const isValid = authenticator.verify({ token, secret })
+
+      if (isValid) {
+        await pool.query(
+          'UPDATE users SET two_factor_enabled = true WHERE id = $1',
+          [req.user.id]
+        )
+        res.json({ success: true, message: '2FA habilitado correctamente' })
+      } else {
+        // Log para depuración
+        console.log(`[2FA] Código inválido. Token recibido: ${token}, Secret: ${secret.substring(0, 5)}...`)
+        res.status(400).json({ error: 'Código inválido' })
+      }
+    } catch (error) {
+      console.error('Error confirming 2FA:', error)
+      res.status(500).json({ error: 'Error interno del servidor' })
+    }
   },
 
-  async githubCallback(req: Request, res: Response) {
-    // Implementar callback de GitHub OAuth
-    res.json({ message: 'GitHub OAuth callback - Implementar' })
+  disable2FA: async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'No autenticado' })
+
+      await pool.query(
+        'UPDATE users SET two_factor_enabled = false, two_factor_secret = NULL WHERE id = $1',
+        [req.user.id]
+      )
+
+      res.json({ success: true, message: '2FA deshabilitado correctamente' })
+    } catch (error) {
+      console.error('Error disabling 2FA:', error)
+      res.status(500).json({ error: 'Error interno del servidor' })
+    }
   },
+
+  googleAuth: async (req: Request, res: Response) => {
+    // Stub
+    res.status(501).json({ error: 'Not implemented' })
+  },
+
+  googleCallback: async (req: Request, res: Response) => {
+    // Stub
+    res.status(501).json({ error: 'Not implemented' })
+  },
+
+  githubAuth: async (req: Request, res: Response) => {
+    // Stub
+    res.status(501).json({ error: 'Not implemented' })
+  },
+
+  githubCallback: async (req: Request, res: Response) => {
+    // Stub
+    res.status(501).json({ error: 'Not implemented' })
+  }
 }
-

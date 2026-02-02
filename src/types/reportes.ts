@@ -1,6 +1,5 @@
 export enum EstadoReporte {
   Pendiente = 'Pendiente',
-  EnRevision = 'EnRevision',
   Aprobado = 'Aprobado',
   Rechazado = 'Rechazado',
 }
@@ -19,6 +18,9 @@ export interface ReporteVentas {
     mermaVolumen: number
     mermaImporte: number
     mermaPorcentaje: number
+    eficienciaReal?: number
+    eficienciaImporte?: number
+    eficienciaRealPorcentaje?: number
     iib?: number
     compras?: number
     cct?: number
@@ -35,6 +37,9 @@ export interface ReporteVentas {
     mermaVolumen: number
     mermaImporte: number
     mermaPorcentaje: number
+    eficienciaReal?: number
+    eficienciaImporte?: number
+    eficienciaRealPorcentaje?: number
     iib?: number
     compras?: number
     cct?: number
@@ -51,6 +56,9 @@ export interface ReporteVentas {
     mermaVolumen: number
     mermaImporte: number
     mermaPorcentaje: number
+    eficienciaReal?: number
+    eficienciaImporte?: number
+    eficienciaRealPorcentaje?: number
     iib?: number
     compras?: number
     cct?: number
@@ -92,3 +100,10 @@ export interface AuditoriaReporte {
   fechaCambio: string
 }
 
+
+export interface ProductoCatalogo {
+  id: string
+  nombre: string
+  nombre_display: string
+  activo: boolean
+}

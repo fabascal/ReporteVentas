@@ -20,12 +20,13 @@ interface VistaDashboardProps {
   totalGeneralDia: number
   datosPreciosPorDia: Array<{ dia: string; Premium: number; Magna: number; Diesel: number }>
   datosLitrosPorZona: Array<{ zona: string; Premium: number; Magna: number; Diesel: number }>
-  datosVentasPorZona: Array<{ zona: string; 'Total Ventas': number }>
+  datosMermaPorEstacion: Array<{ estacion: string; Premium: number; Magna: number; Diesel: number }>
   datosTopEstaciones: Array<{ estacion: string; zona: string; 'Total Ventas': number }>
   fechaFiltro: string
   setFechaFiltro: (fecha: string) => void
   reportesAcumulados: ReporteVentas[]
   reportesDiaSeleccionado: ReporteVentas[]
+  onOpenCierre: () => void
 }
 
 const VistaDashboard: React.FC<VistaDashboardProps> = ({
@@ -35,12 +36,13 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
   totalGeneralDia,
   datosPreciosPorDia,
   datosLitrosPorZona,
-  datosVentasPorZona,
+  datosMermaPorEstacion,
   datosTopEstaciones,
   fechaFiltro,
   setFechaFiltro,
   reportesAcumulados,
   reportesDiaSeleccionado,
+  onOpenCierre,
 }) => {
   // Usar mediodía para evitar problemas de zona horaria
   const fechaSeleccionada = new Date(fechaFiltro + 'T12:00:00')
@@ -93,6 +95,13 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
               Período: <span className="font-semibold text-[#111418] dark:text-white capitalize">{nombreMes}</span>
             </span>
           </div>
+          <button
+            onClick={onOpenCierre}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors shadow-sm"
+          >
+            <span className="material-symbols-outlined text-lg">lock</span>
+            <span>Cierre Mensual</span>
+          </button>
         </div>
       </div>
 
@@ -248,34 +257,115 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
         </div>
       </div>
 
-      {/* Gráfica de Ventas Totales por Zona */}
+      {/* Merma por Estación */}
       <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm mb-8">
         <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4 flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#1173d4]">trending_up</span>
-          Ventas Totales por Zona - {nombreMes}
+          <span className="material-symbols-outlined text-[#ef4444]">warning</span>
+          Merma por Estación (%) - {nombreMes}
         </h3>
-        {datosVentasPorZona.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={datosVentasPorZona}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e6e8eb" className="dark:stroke-slate-700" />
-              <XAxis dataKey="zona" stroke="#617589" className="dark:stroke-slate-400" />
-              <YAxis stroke="#617589" className="dark:stroke-slate-400" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e6e8eb',
-                  borderRadius: '8px',
-                }}
-                formatter={(value: number | undefined) => value ? `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
-              />
-              <Bar dataKey="Total Ventas" fill="#1173d4" />
-            </BarChart>
-          </ResponsiveContainer>
+        {datosMermaPorEstacion.length > 0 ? (
+          <>
+            <ResponsiveContainer width="100%" height={Math.max(400, datosMermaPorEstacion.length * 35)}>
+              <BarChart 
+                data={datosMermaPorEstacion} 
+                layout="vertical"
+                margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e6e8eb" className="dark:stroke-slate-700" />
+                <XAxis 
+                  type="number" 
+                  stroke="#617589" 
+                  className="dark:stroke-slate-400"
+                  tickFormatter={(value) => `${value}%`}
+                />
+                <YAxis 
+                  type="category" 
+                  dataKey="estacion" 
+                  stroke="#617589" 
+                  className="dark:stroke-slate-400"
+                  width={90}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #e6e8eb',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value: number | undefined) => value ? `${value.toFixed(2)}%` : '0.00%'}
+                />
+                <Legend />
+                <Bar dataKey="Premium" fill="#ef4444" name="Premium" />
+                <Bar dataKey="Magna" fill="#22c55e" name="Magna" />
+                <Bar dataKey="Diesel" fill="#6b7280" name="Diesel" />
+              </BarChart>
+            </ResponsiveContainer>
+
+            {/* Tabla completa de todas las estaciones */}
+            <div className="mt-6">
+              <h4 className="text-md font-semibold text-[#111418] dark:text-white mb-3">Todas las Estaciones</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-800">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        #
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Estación
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Premium (%)
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Magna (%)
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Diesel (%)
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Promedio (%)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-[#1a2632] divide-y divide-gray-200 dark:divide-gray-700">
+                    {datosMermaPorEstacion.map((estacion, index) => {
+                      const promedio = (estacion.Premium + estacion.Magna + estacion.Diesel) / 3
+                      const bgColor = promedio > 6 ? 'bg-red-50 dark:bg-red-900/20' : 
+                                     promedio > 4 ? 'bg-yellow-50 dark:bg-yellow-900/20' : 
+                                     'bg-green-50 dark:bg-green-900/20'
+                      return (
+                        <tr key={estacion.estacion} className={bgColor}>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {index + 1}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {estacion.estacion}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
+                            {estacion.Premium.toFixed(2)}%
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
+                            {estacion.Magna.toFixed(2)}%
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
+                            {estacion.Diesel.toFixed(2)}%
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold text-gray-900 dark:text-gray-100">
+                            {promedio.toFixed(2)}%
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
         ) : (
           <div className="h-[300px] flex items-center justify-center text-[#617589] dark:text-slate-400">
             <div className="text-center">
               <span className="material-symbols-outlined text-6xl mb-4">bar_chart</span>
-              <p>No hay datos disponibles para este mes</p>
+              <p>No hay datos de merma disponibles para este mes</p>
             </div>
           </div>
         )}

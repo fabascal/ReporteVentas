@@ -1,17 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import { reportesService } from '../services/reportesService'
-import { ReporteVentas, EstadoReporte } from '../types/reportes'
+import { ReporteVentas } from '../types/reportes'
 import DirectorHeader from '../components/DirectorHeader'
+import { formatFechaSolo } from '../utils/dateUtils'
 
 export default function DashboardDirector() {
   const { user, logout } = useAuth()
 
-  // Obtener solo reportes aprobados
   const { data: reportes = [], isLoading } = useQuery({
-    queryKey: ['reportes'],
-    queryFn: reportesService.getReportes,
-    select: (data) => data.filter((r) => r.estado === EstadoReporte.Aprobado),
+    queryKey: ['reportes', 'director'],
+    queryFn: () => reportesService.getReportes(1, 1000, 'Aprobado'),
+    select: (data) => data.data,
   })
 
   // Calcular totales
@@ -49,7 +49,7 @@ export default function DashboardDirector() {
             </h1>
             <div className="flex items-center gap-2 text-[#617589] dark:text-slate-400">
               <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-              <p className="text-base font-normal">Resumen ejecutivo de reportes aprobados</p>
+              <p className="text-base font-normal">Resumen ejecutivo de reportes capturados</p>
             </div>
           </div>
         </div>
@@ -353,10 +353,7 @@ export default function DashboardDirector() {
                           <div className="text-sm text-[#111418] dark:text-white">{reporte.revisadoPor || 'N/A'}</div>
                           {reporte.fechaRevision && (
                             <div className="text-xs text-[#617589] dark:text-slate-400 mt-1">
-                              {new Date(reporte.fechaRevision).toLocaleDateString('es-MX', {
-                                day: 'numeric',
-                                month: 'short',
-                              })}
+                              {formatFechaSolo(reporte.fechaRevision)}
                             </div>
                           )}
                         </td>

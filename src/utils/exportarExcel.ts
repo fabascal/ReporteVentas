@@ -1,4 +1,5 @@
 import { ReporteVentas } from '../types/reportes'
+import { formatFechaHora, formatFechaSolo } from './dateUtils'
 
 /**
  * Función para exportar un reporte a Excel (CSV) con todos los campos gerenciales
@@ -41,9 +42,9 @@ export function exportarReporteExcel(reporte: ReporteVentas) {
     [''],
     ['AUDITORÍA'],
     ['Creado por:', reporte.creadoPor || 'N/A'],
-    ['Fecha de creación:', reporte.fechaCreacion ? new Date(reporte.fechaCreacion).toLocaleString('es-MX') : 'N/A'],
+    ['Fecha de creación:', reporte.fechaCreacion ? formatFechaHora(reporte.fechaCreacion) : 'N/A'],
     ['Revisado por:', reporte.revisadoPor || 'N/A'],
-    ['Fecha de revisión:', reporte.fechaRevision ? new Date(reporte.fechaRevision).toLocaleString('es-MX') : 'N/A'],
+    ['Fecha de revisión:', reporte.fechaRevision ? formatFechaHora(reporte.fechaRevision) : 'N/A'],
     ...(reporte.comentarios ? [['Comentarios:', reporte.comentarios]] : []),
     [''],
     ['='.repeat(100)],

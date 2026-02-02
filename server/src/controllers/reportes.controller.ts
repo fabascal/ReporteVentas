@@ -170,6 +170,11 @@ export const reportesController = {
       
       // Filtro opcional por estado (para historial, revision, etc.)
       const estadoFiltro = req.query.estado as string | undefined
+      
+      // Filtros adicionales
+      const estacionIdFiltro = req.query.estacionId as string | undefined
+      const fechaDesdeFiltro = req.query.fechaDesde as string | undefined
+      const fechaHastaFiltro = req.query.fechaHasta as string | undefined
 
       // Query para contar total de reportes
       let countQuery = `
@@ -202,7 +207,7 @@ export const reportesController = {
       if (req.user.role === 'GerenteEstacion') {
         // Reportes en estado Pendiente, EnRevision, Aprobado o Rechazado de sus estaciones asignadas
         // (EnRevision son los que el gerente aprobó, Aprobado y Rechazado son los ya procesados por GerenteZona)
-        let estadosPermitidos = [EstadoReporte.Pendiente, EstadoReporte.EnRevision, EstadoReporte.Aprobado, EstadoReporte.Rechazado]
+        let estadosPermitidos = [EstadoReporte.Pendiente, EstadoReporte.Pendiente, EstadoReporte.Aprobado, EstadoReporte.Rechazado]
         
         // Si hay filtro de estado, aplicarlo
         if (estadoFiltro) {
@@ -211,7 +216,7 @@ export const reportesController = {
             estadosPermitidos = [EstadoReporte.Aprobado, EstadoReporte.Rechazado]
           } else if (estadoFiltro === 'Pendiente,EnRevision') {
             // Para reportes activos: Pendiente y EnRevision
-            estadosPermitidos = [EstadoReporte.Pendiente, EstadoReporte.EnRevision]
+            estadosPermitidos = [EstadoReporte.Pendiente, EstadoReporte.Pendiente]
           } else {
             estadosPermitidos = [estadoFiltro as EstadoReporte]
           }
@@ -225,25 +230,25 @@ export const reportesController = {
         params.push(estadosPermitidos, req.user.id)
         paramCount += 2
       } else if (req.user.role === 'GerenteZona') {
-        // Reportes en estado EnRevision, Aprobado o Rechazado de estaciones en sus zonas asignadas
+        // Reportes en estado EnRevision, Aprobado o Rechazado de estaciones en su zona asignada
         // (Aprobado y Rechazado son los que el gerente de zona aprobó/rechazó)
-        let estadosPermitidos = [EstadoReporte.EnRevision, EstadoReporte.Aprobado, EstadoReporte.Rechazado]
+        let estadosPermitidos = [EstadoReporte.Pendiente, EstadoReporte.Aprobado, EstadoReporte.Rechazado]
         
         // Si hay filtro de estado, aplicarlo
         if (estadoFiltro) {
           if (estadoFiltro === 'Aprobado,Rechazado') {
             // Para historial: solo Aprobado y Rechazado
             estadosPermitidos = [EstadoReporte.Aprobado, EstadoReporte.Rechazado]
-          } else if (estadoFiltro === 'EnRevision') {
+          } else if (estadoFiltro === 'Pendiente') {
             // Para revisión: solo EnRevision
-            estadosPermitidos = [EstadoReporte.EnRevision]
+            estadosPermitidos = [EstadoReporte.Pendiente]
           } else {
             estadosPermitidos = [estadoFiltro as EstadoReporte]
           }
         }
         
-        const filterClause = ` AND r.estado = ANY($${paramCount}::text[]) AND e.zona_id IN (
-          SELECT zona_id FROM user_zonas WHERE user_id = $${paramCount + 1}
+        const filterClause = ` AND r.estado = ANY($${paramCount}::text[]) AND e.zona_id = (
+          SELECT zona_id FROM users WHERE id = $${paramCount + 1}
         )`
         query += filterClause
         countQuery += filterClause
@@ -273,6 +278,31 @@ export const reportesController = {
             paramCount++
           }
         }
+      }
+
+      // Aplicar filtros adicionales (estación, fechas)
+      if (estacionIdFiltro) {
+        const filterClause = ` AND r.estacion_id = $${paramCount}`
+        query += filterClause
+        countQuery += filterClause
+        params.push(estacionIdFiltro)
+        paramCount++
+      }
+
+      if (fechaDesdeFiltro) {
+        const filterClause = ` AND r.fecha >= $${paramCount}`
+        query += filterClause
+        countQuery += filterClause
+        params.push(fechaDesdeFiltro)
+        paramCount++
+      }
+
+      if (fechaHastaFiltro) {
+        const filterClause = ` AND r.fecha <= $${paramCount}`
+        query += filterClause
+        countQuery += filterClause
+        params.push(fechaHastaFiltro)
+        paramCount++
       }
 
       query += ` ORDER BY r.fecha DESC, r.created_at DESC LIMIT $${paramCount} OFFSET $${paramCount + 1}`
@@ -312,20 +342,23 @@ export const reportesController = {
           }
           const tipo = row.tipo_producto.toLowerCase()
           productosData[row.reporte_id][tipo] = {
+            producto_id: row.producto_id,
             precio: parseFloat(row.precio || '0'),
-            litros: parseFloat(row.litros || '0'),
+            litros_vendidos: parseFloat(row.litros || '0'), // BD usa 'litros'
             importe: parseFloat(row.importe || '0'),
-            mermaVolumen: parseFloat(row.merma_volumen || '0'),
-            mermaImporte: parseFloat(row.merma_importe || '0'),
-            mermaPorcentaje: parseFloat(row.merma_porcentaje || '0'),
-            iib: parseFloat(row.iib || '0'),
+            merma_volumen: parseFloat(row.merma_volumen || '0'),
+            merma_importe: parseFloat(row.merma_importe || '0'),
+            merma_porcentaje: parseFloat(row.merma_porcentaje || '0'),
+            eficiencia_real: parseFloat(row.eficiencia_real || '0'),
+            eficiencia_importe: parseFloat(row.eficiencia_importe || '0'),
+            eficiencia_real_porcentaje: parseFloat(row.eficiencia_real_porcentaje || '0'),
+            inventario_inicial: parseFloat(row.iib || '0'), // BD usa 'iib'
             compras: parseFloat(row.compras || '0'),
             cct: parseFloat(row.cct || '0'),
-            vDsc: parseFloat(row.v_dsc || '0'),
+            v_dsc: parseFloat(row.v_dsc || '0'),
             dc: parseFloat(row.dc || '0'),
-            difVDsc: parseFloat(row.dif_v_dsc || '0'),
-            if: parseFloat(row.if || '0'),
-            iffb: parseFloat(row.iffb || '0'),
+            dif_v_dsc: parseFloat(row.dif_v_dsc || '0'),
+            inventario_final: parseFloat(row.iffb || '0'), // BD usa 'iffb'
           }
         })
       }
@@ -334,18 +367,58 @@ export const reportesController = {
         const productos = productosData[row.id] || {}
         
         // Asegurar que existan premium, magna, diesel (para compatibilidad)
-        const defaultProducto = { precio: 0, litros: 0, importe: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, iib: 0, compras: 0, cct: 0, vDsc: 0, dc: 0, difVDsc: 0, if: 0, iffb: 0 }
+        const defaultProducto = { 
+          producto_id: null,
+          precio: 0, 
+          litros_vendidos: 0, 
+          importe: 0, 
+          merma_volumen: 0, 
+          merma_importe: 0, 
+          merma_porcentaje: 0, 
+          eficiencia_real: 0,
+          eficiencia_importe: 0,
+          eficiencia_real_porcentaje: 0,
+          inventario_inicial: 0, 
+          compras: 0, 
+          cct: 0, 
+          v_dsc: 0, 
+          dc: 0, 
+          dif_v_dsc: 0, 
+          inventario_final: 0 
+        }
         
-        return {
+        // Función helper para transformar snake_case a camelCase
+        const transformProducto = (prod: any) => ({
+          productoId: prod.producto_id,
+          precio: prod.precio,
+          litros: prod.litros_vendidos,
+          importe: prod.importe,
+          mermaVolumen: prod.merma_volumen,
+          mermaImporte: prod.merma_importe,
+          mermaPorcentaje: prod.merma_porcentaje,
+          eficienciaReal: prod.eficiencia_real,
+          eficienciaImporte: prod.eficiencia_importe,
+          eficienciaRealPorcentaje: prod.eficiencia_real_porcentaje,
+          iib: prod.inventario_inicial,
+          compras: prod.compras,
+          cct: prod.cct,
+          vDsc: prod.v_dsc,
+          dc: prod.dc,
+          difVDsc: prod.dif_v_dsc,
+          if: prod.inventario_final,
+          iffb: prod.inventario_final,
+        })
+
+        const reporte = {
           id: row.id,
           estacionId: row.estacion_id,
           estacionNombre: row.estacion_nombre,
           zonaNombre: row.zona_nombre,
           fecha: row.fecha,
           aceites: parseFloat(row.aceites || '0'),
-          premium: productos.premium || defaultProducto,
-          magna: productos.magna || defaultProducto,
-          diesel: productos.diesel || defaultProducto,
+          premium: transformProducto(productos.premium || defaultProducto),
+          magna: transformProducto(productos.magna || defaultProducto),
+          diesel: transformProducto(productos.diesel || defaultProducto),
           estado: row.estado,
           creadoPor: row.creado_por_nombre || row.creado_por,
           revisadoPor: row.revisado_por_nombre || row.revisado_por,
@@ -353,6 +426,8 @@ export const reportesController = {
           fechaRevision: row.fecha_revision,
           comentarios: row.comentarios,
         }
+        
+        return reporte
       })
 
       res.json({
@@ -722,12 +797,12 @@ export const reportesController = {
         }
 
         // Solo puede cambiar a EnRevision (aprobado) o Rechazado
-        if (estado !== EstadoReporte.EnRevision && estado !== EstadoReporte.Rechazado) {
+        if (estado !== EstadoReporte.Pendiente && estado !== EstadoReporte.Rechazado) {
           return res.status(400).json({ message: 'Solo puedes aprobar (EnRevision) o rechazar el reporte' })
         }
       } else if (req.user.role === 'GerenteZona') {
         // Gerente de Zona solo puede aprobar o rechazar reportes EnRevision de sus zonas
-        if (estadoActual !== EstadoReporte.EnRevision) {
+        if (estadoActual !== EstadoReporte.Pendiente) {
           return res.status(403).json({ message: 'Solo puedes aprobar o rechazar reportes en revisión' })
         }
 
@@ -871,7 +946,7 @@ export const reportesController = {
       console.log('Estacion ID del body:', estacionId)
 
       // Solo permitir editar si está pendiente (excepto para Administradores)
-      const esAdministrador = req.user.role === 'Administrador' || req.user.role === Role.Administrador
+      const esAdministrador = req.user.role === 'Administrador'
       if (reporte.estado !== EstadoReporte.Pendiente && !esAdministrador) {
         console.log('ERROR: Reporte no está pendiente. Estado:', reporte.estado, 'Usuario role:', req.user.role)
         return res.status(403).json({ 
@@ -899,7 +974,7 @@ export const reportesController = {
       // - Administrador puede editar cualquier reporte
       // - GerenteEstacion puede editar reportes pendientes de sus estaciones asignadas (aunque no sea el creador)
       const esCreador = reporte.creado_por === req.user.id
-      const esGerenteEstacion = req.user.role === 'GerenteEstacion' || req.user.role === Role.GerenteEstacion
+      const esGerenteEstacion = req.user.role === 'GerenteEstacion'
       const puedeEditar = esCreador || esAdministrador || (esGerenteEstacion && tieneAccesoEstacion && reporte.estado === EstadoReporte.Pendiente)
 
       if (!puedeEditar) {

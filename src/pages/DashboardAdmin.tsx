@@ -3,7 +3,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { useQuery } from '@tanstack/react-query'
 import { usuariosService } from '../services/usuariosService'
 import { reportesService } from '../services/reportesService'
-import { EstadoReporte } from '../types/reportes'
 import AdminHeader from '../components/AdminHeader'
 
 export default function DashboardAdmin() {
@@ -30,11 +29,11 @@ export default function DashboardAdmin() {
     queryFn: reportesService.getEstaciones,
   })
 
-  // Calcular estadísticas
+  // Calcular estadísticas (usar estadísticas del backend para totales globales)
   const totalUsuarios = usuarios.length
   const totalReportes = reportesData?.pagination?.total || reportes.length
-  const reportesAprobados = reportes.filter((r) => r.estado === EstadoReporte.Aprobado).length
-  const reportesPendientes = reportes.filter((r) => r.estado === EstadoReporte.Pendiente).length
+  const reportesCapturados = totalReportes
+  const reportesPendientes = reportes.filter(r => r.estado === 'Pendiente').length
   const totalEstaciones = estaciones.length
 
   return (
@@ -110,7 +109,7 @@ export default function DashboardAdmin() {
             </div>
           </div>
 
-          {/* KPI 3 - Reportes Aprobados */}
+          {/* KPI 3 - Reportes Capturados */}
           <div className="group relative overflow-hidden rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm transition-all hover:shadow-md">
             <div className="mb-4 flex items-start justify-between">
               <div className="rounded-lg bg-green-50 dark:bg-green-900/30 p-2 text-green-600 dark:text-green-400">
@@ -118,18 +117,18 @@ export default function DashboardAdmin() {
               </div>
               <span className="flex items-center gap-1 rounded-full bg-green-50 dark:bg-green-900/30 px-2 py-1 text-xs font-bold text-green-700 dark:text-green-400">
                 <span className="material-symbols-outlined text-sm">check_circle</span>
-                {reportesAprobados}
+                {reportesCapturados}
               </span>
             </div>
-            <p className="text-sm font-medium text-[#617589] dark:text-slate-400">Reportes Aprobados</p>
+            <p className="text-sm font-medium text-[#617589] dark:text-slate-400">Reportes Capturados</p>
             <p className="mt-1 text-2xl font-bold tracking-tight text-[#111418] dark:text-white">
-              {totalReportes > 0 ? Math.round((reportesAprobados / totalReportes) * 100) : 0}%
+              {reportesCapturados}
             </p>
             <div className="absolute bottom-0 left-0 h-1 w-full bg-gray-100 dark:bg-gray-800">
               <div
                 className="h-full bg-green-500"
                 style={{
-                  width: `${totalReportes > 0 ? (reportesAprobados / totalReportes) * 100 : 0}%`,
+                  width: '100%',
                 }}
               ></div>
             </div>
@@ -236,15 +235,15 @@ export default function DashboardAdmin() {
                 <div className="flex justify-between text-sm font-medium">
                   <span className="text-[#111418] dark:text-white flex items-center gap-2">
                     <span className="size-2 rounded-full bg-green-500"></span>
-                    Reportes Aprobados
+                    Reportes Capturados
                   </span>
-                  <span className="text-[#1173d4] font-bold">{reportesAprobados}</span>
+                  <span className="text-[#1173d4] font-bold">{reportesCapturados}</span>
                 </div>
                 <div className="h-2.5 w-full bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-green-500 rounded-full"
                     style={{
-                      width: `${totalReportes > 0 ? (reportesAprobados / totalReportes) * 100 : 0}%`,
+                      width: '100%',
                     }}
                   ></div>
                 </div>

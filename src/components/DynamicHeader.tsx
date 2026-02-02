@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../contexts/AuthContext'
 import ThemeToggle from './ThemeToggle'
+import TwoFactorSetupModal from './TwoFactorSetupModal'
 import { getHeaderConfigForRole, getMenuItemsForRole } from '../config/menuConfig'
 import { menusService, MenuItem } from '../services/menusService'
 import { Role } from '../types/auth'
@@ -16,6 +18,9 @@ export default function DynamicHeader({ activeViewId, onViewChange }: DynamicHea
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [is2FAModalOpen, setIs2FAModalOpen] = useState(false)
+
+  // ... rest of the code until return ...
 
   // Obtener menús desde la base de datos con fallback a menuConfig
   const { data: menuItemsFromDB = [], isLoading, error } = useQuery({
@@ -70,16 +75,34 @@ export default function DynamicHeader({ activeViewId, onViewChange }: DynamicHea
         console.log('Changing view to:', item.view_id)
         onViewChange(item.view_id)
       } else {
-        // Para Admin: convertir view_id a ruta
-        // Mapear view_id a rutas específicas
-        const viewToRoute: Record<string, string> = {
-          'historial': '/admin/historial',
-          'reportes': '/admin/reportes',
-          'dashboard': '/admin',
+        // Si no hay onViewChange (estamos en una ruta independiente), navegar al dashboard base con el viewId
+        console.log('No onViewChange, navigating to dashboard with view:', item.view_id)
+        
+        // Mapear el rol a su dashboard base
+        const roleToDashboard: Record<string, string> = {
+          [Role.GerenteEstacion]: '/gerente-estacion',
+          [Role.GerenteZona]: '/gerente-zona',
+          [Role.Direccion]: '/director',
+          [Role.Administrador]: '/admin',
         }
-        const route = viewToRoute[item.view_id] || `/admin/${item.view_id}`
-        console.log('Navigating Admin view to route:', route)
-        navigate(route)
+
+        const baseRoute = roleToDashboard[user.role] || '/login'
+
+        if (user.role === Role.Administrador) {
+          // Para Admin: convertir view_id a ruta específica
+          const viewToRoute: Record<string, string> = {
+            'historial': '/admin/historial',
+            'reportes': '/admin/reportes',
+            'dashboard': '/admin',
+          }
+          const route = viewToRoute[item.view_id] || `/admin/${item.view_id}`
+          console.log('Navigating Admin view to route:', route)
+          navigate(route)
+        } else {
+          // Para otros roles: volver al dashboard con el viewId en el estado
+          console.log('Navigating to base route:', baseRoute, 'with view:', item.view_id)
+          navigate(baseRoute, { state: { activeViewId: item.view_id } })
+        }
       }
     } else {
       console.warn('Menu item has no valid path or view_id:', item)
@@ -150,8 +173,10 @@ export default function DynamicHeader({ activeViewId, onViewChange }: DynamicHea
     return true
   })
 
-  // Debug: mostrar menús cargados
-  console.log('Menu items loaded:', activeMenuItems.length, activeMenuItems)
+  // Debug: mostrar menús cargados (solo si no está cargando y hay items)
+  if (!isLoading && activeMenuItems.length > 0) {
+    console.log('Menu items loaded:', activeMenuItems.length, activeMenuItems)
+  }
 
   if (isLoading) {
     return (
@@ -215,6 +240,13 @@ export default function DynamicHeader({ activeViewId, onViewChange }: DynamicHea
             </p>
           </div>
           <button
+            onClick={() => setIs2FAModalOpen(true)}
+            className="size-10 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 flex items-center justify-center hover:bg-gray-200 transition-colors"
+            title="Seguridad / 2FA"
+          >
+            <span className="material-symbols-outlined">security</span>
+          </button>
+          <button
             onClick={logout}
             className="size-10 rounded-full bg-[#1173d4]/10 text-[#1173d4] flex items-center justify-center hover:bg-[#1173d4]/20 transition-colors"
             title="Cerrar sesión"
@@ -223,6 +255,7 @@ export default function DynamicHeader({ activeViewId, onViewChange }: DynamicHea
           </button>
         </div>
       </div>
+      <TwoFactorSetupModal isOpen={is2FAModalOpen} onClose={() => setIs2FAModalOpen(false)} />
     </header>
   )
 }

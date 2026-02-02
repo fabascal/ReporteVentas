@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { Role } from '../types/auth'
+import { authService } from '../services/authService'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -9,8 +10,18 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const { login, loginWithOAuth } = useAuth()
+  const [require2FA, setRequire2FA] = useState(false)
+  const [userId, setUserId] = useState('')
+  const [code2FA, setCode2FA] = useState('')
+  const { login, loginWithOAuth, completeLogin, isAuthenticated, user } = useAuth()
   const navigate = useNavigate()
+
+  // Si ya está autenticado, redirigir
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      navigateByRole(user.role)
+    }
+  }, [isAuthenticated, user])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -18,32 +29,65 @@ export default function Login() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
+      const response = await login(email, password)
+      
+      // Si requiere 2FA, mostrar el modal de 2FA
+      if (response?.require2FA) {
+        setRequire2FA(true)
+        setUserId(response.userId || '')
+        setIsLoading(false)
+        return
+      }
+      
+      // Si el login fue exitoso sin 2FA, redirigir
       const userStr = localStorage.getItem('user')
       if (userStr) {
         const user = JSON.parse(userStr)
-        // Redirigir según el rol
-        switch (user.role) {
-          case Role.Administrador:
-            navigate('/admin')
-            break
-          case Role.GerenteEstacion:
-            navigate('/gerente-estacion')
-            break
-          case Role.GerenteZona:
-            navigate('/gerente-zona')
-            break
-          case Role.Direccion:
-            navigate('/director')
-            break
-          default:
-            navigate('/login')
-        }
+        navigateByRole(user.role)
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al iniciar sesión')
+      setError(err.response?.data?.error || err.response?.data?.message || 'Error al iniciar sesión')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const response = await authService.verify2FALogin(userId, code2FA)
+      
+      // Completar el login con el token recibido
+      completeLogin(response.token, response.user)
+      
+      // Redirigir según el rol
+      navigateByRole(response.user.role)
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || 'Código 2FA inválido')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const navigateByRole = (role: string) => {
+    switch (role) {
+      case Role.Administrador:
+        navigate('/admin')
+        break
+      case Role.GerenteEstacion:
+        navigate('/gerente-estacion')
+        break
+      case Role.GerenteZona:
+        navigate('/gerente-zona')
+        break
+      case Role.Direccion:
+        navigate('/director')
+        break
+      default:
+        navigate('/login')
     }
   }
 
@@ -135,7 +179,57 @@ export default function Login() {
             </div>
           )}
 
-          {/* Form */}
+          {/* Formulario de 2FA */}
+          {require2FA && (
+            <form onSubmit={handle2FASubmit} className="space-y-6" method="POST">
+              <div className="text-center mb-6">
+                <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-[#1173d4]/10 text-[#1173d4] mb-4">
+                  <span className="material-symbols-outlined text-4xl">security</span>
+                </div>
+                <h3 className="text-xl font-bold text-[#111418] mb-2">Verificación en dos pasos</h3>
+                <p className="text-sm text-[#617589]">
+                  Ingresa el código de 6 dígitos de tu aplicación de autenticación
+                </p>
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  value={code2FA}
+                  onChange={(e) => setCode2FA(e.target.value.replace(/\D/g, ''))}
+                  placeholder="000000"
+                  maxLength={6}
+                  autoFocus
+                  className="w-full text-center text-3xl tracking-[0.5em] font-bold py-4 border rounded-xl focus:outline-0 focus:ring-2 focus:ring-[#1173d4]/20 border-[#dbe0e6] bg-white focus:border-[#1173d4]"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRequire2FA(false)
+                    setCode2FA('')
+                    setError('')
+                  }}
+                  className="flex-1 rounded-lg border border-[#dbe0e6] py-4 px-4 text-sm font-bold text-[#111418] hover:bg-gray-50"
+                >
+                  Atrás
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading || code2FA.length < 6}
+                  className="flex-[2] rounded-lg bg-[#1173d4] py-4 px-4 text-sm font-bold text-white hover:bg-[#1173d4]/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Verificando...' : 'Verificar'}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Form de Login Normal */}
+          {!require2FA && (
           <form onSubmit={handleSubmit} className="space-y-6" method="POST">
             {/* User Input */}
             <div>
@@ -234,6 +328,7 @@ export default function Login() {
               <p className="text-xs text-[#617589] font-medium">Conexión Segura SSL 256-bit</p>
             </div>
           </form>
+          )}
 
           {/* Help Link */}
           <div className="mt-8 border-t border-[#f0f2f4] pt-6 text-center">
