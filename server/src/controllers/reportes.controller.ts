@@ -132,9 +132,9 @@ async function guardarProductosReporte(
       INSERT INTO reporte_productos (
         reporte_id, producto_id, precio, litros, importe,
         merma_volumen, merma_importe, merma_porcentaje,
-        iib, compras, cct, v_dsc, dc, dif_v_dsc, if, iffb
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      ON CONFLICT (reporte_id, producto_id) DO UPDATE SET
+        iib, compras, cct, v_dsc, dc, dif_v_dsc, if, iffb, fecha
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, (SELECT fecha FROM reportes WHERE id = $1))
+      ON CONFLICT (reporte_id, producto_id, fecha) DO UPDATE SET
         precio = EXCLUDED.precio,
         litros = EXCLUDED.litros,
         importe = EXCLUDED.importe,
@@ -945,59 +945,96 @@ export const reportesController = {
       console.log('Estacion ID del reporte original:', reporte.estacion_id)
       console.log('Estacion ID del body:', estacionId)
 
-      // Solo permitir editar si está pendiente (excepto para Administradores)
+      // Verificar roles
       const esAdministrador = req.user.role === 'Administrador'
-      if (reporte.estado !== EstadoReporte.Pendiente && !esAdministrador) {
-        console.log('ERROR: Reporte no está pendiente. Estado:', reporte.estado, 'Usuario role:', req.user.role)
-        return res.status(403).json({ 
-          message: `Solo se pueden editar reportes pendientes. El reporte está en estado: ${reporte.estado}` 
-        })
+      const esGerenteEstacion = req.user.role === 'GerenteEstacion'
+      const esGerenteZona = req.user.role === 'GerenteZona'
+
+      // Verificar acceso a la estación según el rol
+      const estacionIdParaVerificar = estacionId || reporte.estacion_id
+      let tieneAccesoEstacion = false
+
+      if (esAdministrador) {
+        tieneAccesoEstacion = true
+      } else if (esGerenteEstacion) {
+        // Gerente de Estación: verificar asignación directa
+        const estacionCheck = await pool.query(
+          `
+          SELECT e.* FROM estaciones e
+          JOIN user_estaciones ue ON e.id = ue.estacion_id
+          WHERE e.id = $1 AND ue.user_id = $2
+          `,
+          [estacionIdParaVerificar, req.user.id]
+        )
+        tieneAccesoEstacion = estacionCheck.rows.length > 0
+        console.log('GerenteEstacion - Estaciones asignadas:', estacionCheck.rows.length)
+      } else if (esGerenteZona) {
+        // Gerente de Zona: verificar que la estación pertenezca a su zona
+        const zonaCheck = await pool.query(
+          `
+          SELECT e.* FROM estaciones e
+          JOIN users u ON u.zona_id = e.zona_id
+          WHERE e.id = $1 AND u.id = $2
+          `,
+          [estacionIdParaVerificar, req.user.id]
+        )
+        tieneAccesoEstacion = zonaCheck.rows.length > 0
+        console.log('GerenteZona - Estación pertenece a su zona:', zonaCheck.rows.length)
       }
 
-      // Verificar que el usuario tenga acceso a la estación (usar la estación del reporte original, no la del body)
-      const estacionIdParaVerificar = estacionId || reporte.estacion_id
-      const estacionCheck = await pool.query(
-        `
-        SELECT e.* FROM estaciones e
-        JOIN user_estaciones ue ON e.id = ue.estacion_id
-        WHERE e.id = $1 AND ue.user_id = $2
-        `,
-        [estacionIdParaVerificar, req.user.id]
-      )
-
-      console.log('Estaciones asignadas al usuario para estacion', estacionIdParaVerificar, ':', estacionCheck.rows.length)
-
-      const tieneAccesoEstacion = estacionCheck.rows.length > 0 || esAdministrador
-
-      // Verificar permisos: 
-      // - El creador puede editar
-      // - Administrador puede editar cualquier reporte
-      // - GerenteEstacion puede editar reportes pendientes de sus estaciones asignadas (aunque no sea el creador)
+      // Verificar permisos según el estado del reporte y el rol:
+      // - Administrador: puede editar cualquier reporte en cualquier estado
+      // - GerenteEstacion: puede editar reportes PENDIENTES de sus estaciones
+      // - GerenteZona: puede editar reportes APROBADOS de su zona (para correcciones)
       const esCreador = reporte.creado_por === req.user.id
-      const esGerenteEstacion = req.user.role === 'GerenteEstacion'
-      const puedeEditar = esCreador || esAdministrador || (esGerenteEstacion && tieneAccesoEstacion && reporte.estado === EstadoReporte.Pendiente)
+      const reporteEstaPendiente = reporte.estado === EstadoReporte.Pendiente
+      const reporteEstaAprobado = reporte.estado === EstadoReporte.Aprobado
+
+      let puedeEditar = false
+      let razonDenegacion = ''
+
+      if (esAdministrador) {
+        puedeEditar = true
+      } else if (esGerenteEstacion) {
+        // Gerente de Estación solo puede editar reportes pendientes de sus estaciones
+        if (!tieneAccesoEstacion) {
+          razonDenegacion = 'No tienes acceso a esta estación'
+        } else if (!reporteEstaPendiente) {
+          razonDenegacion = `Solo puedes editar reportes pendientes. Este reporte está: ${reporte.estado}`
+        } else {
+          puedeEditar = true
+        }
+      } else if (esGerenteZona) {
+        // Gerente de Zona puede editar reportes aprobados de su zona (para correcciones)
+        if (!tieneAccesoEstacion) {
+          razonDenegacion = 'Esta estación no pertenece a tu zona'
+        } else if (!reporteEstaAprobado) {
+          razonDenegacion = `Solo puedes corregir reportes aprobados. Este reporte está: ${reporte.estado}`
+        } else {
+          puedeEditar = true
+        }
+      } else {
+        razonDenegacion = 'Tu rol no tiene permisos para editar reportes'
+      }
 
       if (!puedeEditar) {
-        if (!tieneAccesoEstacion) {
-          console.log('ERROR: Usuario no tiene acceso a la estación. Estacion ID:', estacionIdParaVerificar, 'Usuario ID:', req.user.id)
-          
-          // Obtener todas las estaciones asignadas al usuario para el mensaje de error
-          const todasLasEstaciones = await pool.query(
-            'SELECT estacion_id FROM user_estaciones WHERE user_id = $1',
-            [req.user.id]
-          )
-          console.log('Estaciones asignadas al usuario:', todasLasEstaciones.rows.map(r => r.estacion_id))
-          
-          return res.status(403).json({ 
-            message: `No tienes acceso a esta estación. Contacta al administrador para que te asigne la estación.` 
-          })
-        }
-        
-        console.log('ERROR: Usuario no tiene permiso para editar. Creado por:', reporte.creado_por, 'Usuario ID:', req.user.id, 'Es creador:', esCreador, 'Es admin:', esAdministrador, 'Es GerenteEstacion:', esGerenteEstacion, 'Tiene acceso estacion:', tieneAccesoEstacion)
+        console.log('ERROR: Permiso denegado.', {
+          usuario: req.user.id,
+          rol: req.user.role,
+          reporteEstado: reporte.estado,
+          tieneAccesoEstacion,
+          razon: razonDenegacion
+        })
         return res.status(403).json({ 
-          message: 'No tienes permiso para editar este reporte. Solo el creador, un administrador, o el gerente de la estación pueden editarlo.' 
+          message: razonDenegacion
         })
       }
+
+      console.log('Permisos validados OK:', {
+        rol: req.user.role,
+        reporteEstado: reporte.estado,
+        tieneAccesoEstacion
+      })
 
       console.log('Validaciones pasadas, procediendo a actualizar...')
 

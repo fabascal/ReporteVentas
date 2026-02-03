@@ -15,6 +15,7 @@ import cierreMensualRoutes from './routes/cierreMensual.routes.js'
 import ejerciciosRoutes from './routes/ejercicios.routes.js'
 import { reportesRoutes } from './routes/reportes.routes.js'
 import externalRoutes from './routes/external.routes.js'
+import { importExcelRoutes } from './routes/importExcel.routes.js'
 
 dotenv.config()
 
@@ -39,6 +40,7 @@ app.use('/api/cierre-mensual', cierreMensualRoutes)
 app.use('/api/ejercicios', ejerciciosRoutes)
 app.use('/api/reportes', reportesRoutes)
 app.use('/api/external', externalRoutes)
+app.use('/api/import-excel', importExcelRoutes)
 
 // Health check
 app.get('/health', (req, res) => {

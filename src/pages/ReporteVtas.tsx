@@ -5,6 +5,7 @@ import { Role } from '../types/auth'
 import { reportesService } from '../services/reportesService'
 import { ReporteVentas, EstadoReporte } from '../types/reportes'
 import DynamicHeader from '../components/DynamicHeader'
+import { useEjerciciosActivos } from '../hooks/useEjerciciosActivos'
 
 type TipoProducto = 'premium' | 'magna' | 'diesel'
 
@@ -19,6 +20,9 @@ export default function ReporteVtas() {
   })
   const [anio, setAnio] = useState(() => String(new Date().getFullYear()))
   const [productoSeleccionado, setProductoSeleccionado] = useState<TipoProducto>('premium')
+
+  // Obtener ejercicios activos para el selector de año
+  const { ejercicios: ejerciciosActivos } = useEjerciciosActivos()
 
   // Obtener estaciones disponibles
   const { data: estaciones = [] } = useQuery({
@@ -70,8 +74,7 @@ export default function ReporteVtas() {
   }
 
   const getYearOptions = () => {
-    const currentYear = new Date().getFullYear()
-    return Array.from({ length: 5 }, (_, i) => currentYear - i)
+    return ejerciciosActivos?.map(e => e.anio) || []
   }
 
   const formatNumber = (value: number | undefined): string => {

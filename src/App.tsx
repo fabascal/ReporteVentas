@@ -21,6 +21,7 @@ import AdminHistorial from './pages/AdminHistorial'
 import AdminLogs from './pages/AdminLogs'
 import AdminDetalleZona from './pages/AdminDetalleZona'
 import GestionPeriodos from './pages/GestionPeriodos'
+import ImportarReportes from './pages/ImportarReportes'
 import { Role } from './types/auth'
 import { Toaster } from 'react-hot-toast'
 
@@ -172,6 +173,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[Role.Administrador]}>
               <GestionPeriodos />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/importar-reportes"
+          element={
+            <ProtectedRoute allowedRoles={[Role.Administrador]}>
+              <ImportarReportes />
             </ProtectedRoute>
           }
         />

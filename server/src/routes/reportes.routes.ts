@@ -29,10 +29,10 @@ router.patch(
   reportesController.updateEstado
 )
 
-// Actualizar reporte (GerenteEstacion si está pendiente, o Administrador)
+// Actualizar reporte (GerenteEstacion si está pendiente, GerenteZona si está aprobado, o Administrador)
 router.put(
   '/:id',
-  requireRole(Role.GerenteEstacion, Role.Administrador),
+  requireRole(Role.GerenteEstacion, Role.GerenteZona, Role.Administrador),
   reportesController.updateReporte
 )
 
