@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
 import { pool } from '../config/database.js';
+import { registrarAuditoriaGeneral } from '../utils/auditoria.js';
 
 interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
+    name?: string;
     role: string;
     estaciones?: string[];
     zona_id?: string;
@@ -626,11 +628,44 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
       usuario.id
     ]);
 
-    console.log('[registrarGasto] Gasto registrado:', result.rows[0].id, 'Tipo:', tipo_gasto);
+    const gastoRegistrado = result.rows[0];
+    console.log('[registrarGasto] Gasto registrado:', gastoRegistrado.id, 'Tipo:', tipo_gasto);
+
+    // Obtener nombre de la entidad para la auditoría
+    let nombreEntidad = '';
+    if (tipo_gasto === 'estacion') {
+      const estacionResult = await pool.query('SELECT nombre FROM estaciones WHERE id = $1', [entidad_id]);
+      nombreEntidad = estacionResult.rows[0]?.nombre || entidad_id;
+    } else {
+      const zonaResult = await pool.query('SELECT nombre FROM zonas WHERE id = $1', [entidad_id]);
+      nombreEntidad = zonaResult.rows[0]?.nombre || entidad_id;
+    }
+
+    // Registrar en auditoría
+    await registrarAuditoriaGeneral({
+      entidadTipo: 'GASTO',
+      entidadId: gastoRegistrado.id,
+      usuarioId: usuario.id,
+      usuarioNombre: usuario.name || usuario.email,
+      accion: 'CREAR',
+      descripcion: `Gasto registrado en ${tipo_gasto === 'estacion' ? 'estación' : 'zona'} "${nombreEntidad}": $${monto.toFixed(2)} - ${concepto}`,
+      datosNuevos: {
+        fecha,
+        tipo_gasto,
+        entidad: nombreEntidad,
+        monto,
+        concepto,
+        categoria: categoria || 'General'
+      },
+      metadata: {
+        fecha_gasto: fecha,
+        categoria: categoria || 'General'
+      }
+    });
 
     return res.status(201).json({
       message: 'Gasto registrado exitosamente',
-      gasto: result.rows[0],
+      gasto: gastoRegistrado,
       limite_restante: parseFloat(limite_gastos) - gastos_totales
     });
   } catch (error) {
@@ -898,12 +933,46 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       : [fecha, zona_id, monto, concepto || '', usuario.id];
 
     const result = await pool.query(insertQuery, params);
+    const entregaRegistrada = result.rows[0];
 
-    console.log('[registrarEntrega] Entrega registrada:', result.rows[0].id, 'Tipo:', tipo_entrega);
+    console.log('[registrarEntrega] Entrega registrada:', entregaRegistrada.id, 'Tipo:', tipo_entrega);
+
+    // Obtener nombres de las entidades para la auditoría
+    let descripcionEntrega = '';
+    if (tipo_entrega === 'estacion_zona') {
+      const estacionResult = await pool.query('SELECT nombre FROM estaciones WHERE id = $1', [estacion_id]);
+      const zonaResult = await pool.query('SELECT nombre FROM zonas WHERE id = $1', [zona_id]);
+      const nombreEstacion = estacionResult.rows[0]?.nombre || estacion_id;
+      const nombreZona = zonaResult.rows[0]?.nombre || zona_id;
+      descripcionEntrega = `Entrega de estación "${nombreEstacion}" a zona "${nombreZona}": $${monto.toFixed(2)} - ${concepto || 'Sin concepto'}`;
+    } else {
+      const zonaResult = await pool.query('SELECT nombre FROM zonas WHERE id = $1', [zona_id]);
+      const nombreZona = zonaResult.rows[0]?.nombre || zona_id;
+      descripcionEntrega = `Entrega de zona "${nombreZona}" a dirección: $${monto.toFixed(2)} - ${concepto || 'Sin concepto'}`;
+    }
+
+    // Registrar en auditoría
+    await registrarAuditoriaGeneral({
+      entidadTipo: 'ENTREGA',
+      entidadId: entregaRegistrada.id,
+      usuarioId: usuario.id,
+      usuarioNombre: usuario.name || usuario.email,
+      accion: 'CREAR',
+      descripcion: descripcionEntrega,
+      datosNuevos: {
+        fecha,
+        tipo_entrega,
+        monto,
+        concepto: concepto || ''
+      },
+      metadata: {
+        fecha_entrega: fecha
+      }
+    });
 
     return res.status(201).json({
       message: 'Entrega registrada exitosamente',
-      entrega: result.rows[0]
+      entrega: entregaRegistrada
     });
   } catch (error) {
     console.error('[registrarEntrega] Error:', error);

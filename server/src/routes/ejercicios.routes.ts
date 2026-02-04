@@ -10,6 +10,9 @@ router.use(authenticateToken);
 // Obtener ejercicios activos (disponible para todos los usuarios autenticados)
 router.get('/activos', ejerciciosController.getActivos);
 
+// Obtener periodos disponibles (disponible para todos los usuarios autenticados)
+router.get('/periodos-disponibles', ejerciciosController.getPeriodosDisponibles);
+
 // Obtener todos los ejercicios (solo admin)
 router.get('/', ejerciciosController.getAll);
 

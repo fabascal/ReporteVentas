@@ -15,9 +15,9 @@ interface LogEntry {
   valorNuevo?: string
   descripcion?: string
   fechaCambio: string
+  fechaReporte?: string
   estacionId?: string
   estacionNombre?: string
-  reporteFecha?: string
 }
 
 interface VistaLogsProps {
@@ -32,12 +32,16 @@ export default function VistaLogs({
   const [page, setPage] = useState(1)
   const limit = 20
 
+  // Estados para tipo de log
+  const [tipoLog, setTipoLog] = useState<'reportes' | 'sistema'>('sistema')
+
   // Estados para filtros
   const [filtroAccion, setFiltroAccion] = useState<string>('Todos')
   const [filtroUsuario, setFiltroUsuario] = useState('')
   const [filtroFechaDesde, setFiltroFechaDesde] = useState('')
   const [filtroFechaHasta, setFiltroFechaHasta] = useState('')
   const [busqueda, setBusqueda] = useState('')
+  const [filtroEntidadTipo, setFiltroEntidadTipo] = useState<string>('Todos')
 
   // Construir filtros para la query
   const filters: any = {}
@@ -46,11 +50,14 @@ export default function VistaLogs({
   if (filtroFechaDesde) filters.fechaDesde = filtroFechaDesde
   if (filtroFechaHasta) filters.fechaHasta = filtroFechaHasta
   if (busqueda) filters.busqueda = busqueda
+  if (filtroEntidadTipo !== 'Todos') filters.entidadTipo = filtroEntidadTipo
 
-  // Obtener logs con paginación
+  // Obtener logs con paginación según el tipo
   const { data: logsData, isLoading } = useQuery({
-    queryKey: ['logs', page, limit, filters],
-    queryFn: () => reportesService.getAllLogs(page, limit, filters),
+    queryKey: ['logs', tipoLog, page, limit, filters],
+    queryFn: () => tipoLog === 'reportes' 
+      ? reportesService.getAllLogs(page, limit, filters)
+      : reportesService.getLogsSistema(page, limit, filters),
   })
 
   const logs: LogEntry[] = logsData?.data || []
@@ -136,6 +143,40 @@ export default function VistaLogs({
         </div>
       </div>
 
+      {/* Selector de tipo de log */}
+      <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm mb-6">
+        <div className="flex gap-3">
+          <button
+            onClick={() => {
+              setTipoLog('sistema')
+              setPage(1)
+            }}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors ${
+              tipoLog === 'sistema'
+                ? 'bg-[#1173d4] text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-[#111418] dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm align-middle mr-2">receipt_long</span>
+            Gastos, Entregas y Cierres
+          </button>
+          <button
+            onClick={() => {
+              setTipoLog('reportes')
+              setPage(1)
+            }}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors ${
+              tipoLog === 'reportes'
+                ? 'bg-[#1173d4] text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-[#111418] dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm align-middle mr-2">description</span>
+            Reportes de Ventas
+          </button>
+        </div>
+      </div>
+
       {/* Filtros */}
       <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm mb-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -158,6 +199,26 @@ export default function VistaLogs({
             </div>
           </div>
 
+          {tipoLog === 'sistema' && (
+            <div>
+              <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">Tipo</label>
+              <select
+                value={filtroEntidadTipo}
+                onChange={(e) => {
+                  setFiltroEntidadTipo(e.target.value)
+                  handleFiltroChange()
+                }}
+                className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+              >
+                <option value="Todos">Todos</option>
+                <option value="GASTO">Gastos</option>
+                <option value="ENTREGA">Entregas</option>
+                <option value="CIERRE_PERIODO">Cierres de Período</option>
+                <option value="REAPERTURA_PERIODO">Reaperturas de Período</option>
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">Acción</label>
             <select
@@ -169,11 +230,23 @@ export default function VistaLogs({
               className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
             >
               <option value="Todos">Todos</option>
-              <option value="CREAR">Crear</option>
-              <option value="ACTUALIZAR">Actualizar</option>
-              <option value="APROBAR">Aprobar</option>
-              <option value="RECHAZAR">Rechazar</option>
-              <option value="CAMBIO_ESTADO">Cambio de Estado</option>
+              {tipoLog === 'reportes' ? (
+                <>
+                  <option value="CREAR">Crear</option>
+                  <option value="ACTUALIZAR">Actualizar</option>
+                  <option value="APROBAR">Aprobar</option>
+                  <option value="RECHAZAR">Rechazar</option>
+                  <option value="CAMBIO_ESTADO">Cambio de Estado</option>
+                </>
+              ) : (
+                <>
+                  <option value="CREAR">Crear</option>
+                  <option value="ACTUALIZAR">Actualizar</option>
+                  <option value="ELIMINAR">Eliminar</option>
+                  <option value="CERRAR">Cerrar</option>
+                  <option value="REABRIR">Reabrir</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -222,6 +295,7 @@ export default function VistaLogs({
           <button
             onClick={() => {
               setFiltroAccion('Todos')
+              setFiltroEntidadTipo('Todos')
               setFiltroUsuario('')
               setFiltroFechaDesde('')
               setFiltroFechaHasta('')
@@ -256,88 +330,157 @@ export default function VistaLogs({
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[#f6f7f8] dark:bg-[#101922] border-b border-[#e6e8eb] dark:border-slate-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      Fecha/Hora
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      Usuario
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      Acción
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      Estación
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      Fecha Reporte
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      Campo
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      Descripción
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#e6e8eb] dark:divide-slate-700">
-                  {logs.map((log) => (
-                    <tr
-                      key={log.id}
-                      className="hover:bg-[#f6f7f8] dark:hover:bg-[#101922] transition-colors"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
-                        {formatFechaHora(log.fechaCambio)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
-                        {log.usuarioNombre || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getAccionBadge(
-                            log.accion
-                          )}`}
-                        >
-                          <span className="material-symbols-outlined text-sm">
-                            {getAccionIcon(log.accion)}
-                          </span>
-                          {log.accion}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
-                        {log.estacionNombre || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
-                        {formatFechaSolo(log.reporteFecha)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#111418] dark:text-white">
-                        {log.campoModificado ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="font-medium">{log.campoModificado}</span>
-                            {log.valorAnterior && (
-                              <span className="text-xs text-red-600 dark:text-red-400">
-                                Antes: {log.valorAnterior}
-                              </span>
-                            )}
-                            {log.valorNuevo && (
-                              <span className="text-xs text-green-600 dark:text-green-400">
-                                Después: {log.valorNuevo}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[#617589] dark:text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-[#111418] dark:text-white max-w-xs">
-                        {log.descripcion || '-'}
-                      </td>
+              {tipoLog === 'reportes' ? (
+                <table className="w-full">
+                  <thead className="bg-[#f6f7f8] dark:bg-[#101922] border-b border-[#e6e8eb] dark:border-slate-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Fecha/Hora
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Usuario
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Acción
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Estación
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Fecha Reporte
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Campo
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Descripción
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[#e6e8eb] dark:divide-slate-700">
+                    {logs.map((log) => (
+                      <tr
+                        key={log.id}
+                        className="hover:bg-[#f6f7f8] dark:hover:bg-[#101922] transition-colors"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
+                          {formatFechaHora(log.fechaCambio || log.fecha_cambio)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
+                          {log.usuarioNombre || log.usuario_nombre || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getAccionBadge(
+                              log.accion
+                            )}`}
+                          >
+                            <span className="material-symbols-outlined text-sm">
+                              {getAccionIcon(log.accion)}
+                            </span>
+                            {log.accion}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
+                          {log.estacionNombre || log.estacion_nombre || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
+                          {log.fechaReporte || log.fecha_reporte ? formatFechaSolo(log.fechaReporte || log.fecha_reporte) : 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#111418] dark:text-white">
+                          {log.campoModificado || log.campo_modificado ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="font-medium">{log.campoModificado || log.campo_modificado}</span>
+                              {(log.valorAnterior || log.valor_anterior) && (
+                                <span className="text-xs text-red-600 dark:text-red-400">
+                                  Antes: {log.valorAnterior || log.valor_anterior}
+                                </span>
+                              )}
+                              {(log.valorNuevo || log.valor_nuevo) && (
+                                <span className="text-xs text-green-600 dark:text-green-400">
+                                  Después: {log.valorNuevo || log.valor_nuevo}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[#617589] dark:text-slate-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#111418] dark:text-white max-w-xs">
+                          {log.descripcion || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-[#f6f7f8] dark:bg-[#101922] border-b border-[#e6e8eb] dark:border-slate-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Fecha/Hora
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Usuario
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Tipo
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Acción
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                        Descripción
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#e6e8eb] dark:divide-slate-700">
+                    {logs.map((log: any) => (
+                      <tr
+                        key={log.id}
+                        className="hover:bg-[#f6f7f8] dark:hover:bg-[#101922] transition-colors"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
+                          {formatFechaHora(log.fecha_cambio)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-[#111418] dark:text-white">
+                          {log.usuario_nombre || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+                              log.entidad_tipo === 'GASTO'
+                                ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400'
+                                : log.entidad_tipo === 'ENTREGA'
+                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400'
+                                : log.entidad_tipo === 'CIERRE_PERIODO'
+                                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                                : 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
+                            }`}
+                          >
+                            {log.entidad_tipo}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${getAccionBadge(
+                              log.accion
+                            )}`}
+                          >
+                            <span className="material-symbols-outlined text-sm">
+                              {getAccionIcon(log.accion)}
+                            </span>
+                            {log.accion}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-[#111418] dark:text-white max-w-md">
+                          {log.descripcion || '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
             {pagination && (pagination.total > 0 || logs.length > 0) && (
               <Paginacion

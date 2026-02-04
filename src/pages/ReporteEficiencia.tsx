@@ -156,14 +156,14 @@ export default function ReporteEficiencia() {
   // Calcular totales
   const calcularTotales = () => {
     return reportes.reduce((acc, reporte) => {
-      acc.ePremium += reporte.premium?.merma_volumen || 0
-      acc.eMagna += reporte.magna?.merma_volumen || 0
-      acc.eDiesel += reporte.diesel?.merma_volumen || 0
-      acc.totalMerma += (reporte.premium?.merma_volumen || 0) + (reporte.magna?.merma_volumen || 0) + (reporte.diesel?.merma_volumen || 0)
-      acc.mermaPremiumPesos += reporte.premium?.merma_importe || 0
-      acc.mermaMagnaPesos += reporte.magna?.merma_importe || 0
-      acc.mermaDieselPesos += reporte.diesel?.merma_importe || 0
-      acc.totalPesos += (reporte.premium?.merma_importe || 0) + (reporte.magna?.merma_importe || 0) + (reporte.diesel?.merma_importe || 0)
+      acc.ePremium += reporte.premium?.mermaVolumen || 0
+      acc.eMagna += reporte.magna?.mermaVolumen || 0
+      acc.eDiesel += reporte.diesel?.mermaVolumen || 0
+      acc.totalMerma += (reporte.premium?.mermaVolumen || 0) + (reporte.magna?.mermaVolumen || 0) + (reporte.diesel?.mermaVolumen || 0)
+      acc.mermaPremiumPesos += reporte.premium?.mermaImporte || 0
+      acc.mermaMagnaPesos += reporte.magna?.mermaImporte || 0
+      acc.mermaDieselPesos += reporte.diesel?.mermaImporte || 0
+      acc.totalPesos += (reporte.premium?.mermaImporte || 0) + (reporte.magna?.mermaImporte || 0) + (reporte.diesel?.mermaImporte || 0)
       return acc
     }, {
       ePremium: 0,
@@ -179,17 +179,35 @@ export default function ReporteEficiencia() {
 
   const totales = calcularTotales()
 
-  // Calcular promedios para porcentajes
+  // Calcular promedios para porcentajes (E / V)
   const promedioEfPremiumPct = reportes.length > 0
-    ? reportes.reduce((sum, r) => sum + (r.premium?.eficiencia_real_porcentaje || 0), 0) / reportes.length
+    ? reportes.reduce((sum, r) => {
+        const merma = r.premium?.mermaVolumen || 0
+        const litros = r.premium?.litros || 0
+        const v = litros - merma
+        const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+        return sum + porcentaje
+      }, 0) / reportes.length
     : 0
 
   const promedioEfMagnaPct = reportes.length > 0
-    ? reportes.reduce((sum, r) => sum + (r.magna?.eficiencia_real_porcentaje || 0), 0) / reportes.length
+    ? reportes.reduce((sum, r) => {
+        const merma = r.magna?.mermaVolumen || 0
+        const litros = r.magna?.litros || 0
+        const v = litros - merma
+        const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+        return sum + porcentaje
+      }, 0) / reportes.length
     : 0
 
   const promedioEfDieselPct = reportes.length > 0
-    ? reportes.reduce((sum, r) => sum + (r.diesel?.eficiencia_real_porcentaje || 0), 0) / reportes.length
+    ? reportes.reduce((sum, r) => {
+        const merma = r.diesel?.mermaVolumen || 0
+        const litros = r.diesel?.litros || 0
+        const v = litros - merma
+        const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+        return sum + porcentaje
+      }, 0) / reportes.length
     : 0
 
   return (
@@ -348,19 +366,19 @@ export default function ReporteEficiencia() {
                       <>
                         {reportes.map((reporte) => {
                           const dia = new Date(reporte.fecha).getDate()
-                          const totalMerma = (reporte.premium?.merma_volumen || 0) + 
-                                           (reporte.magna?.merma_volumen || 0) + 
-                                           (reporte.diesel?.merma_volumen || 0)
-                          const totalPesos = (reporte.premium?.merma_importe || 0) + 
-                                           (reporte.magna?.merma_importe || 0) + 
-                                           (reporte.diesel?.merma_importe || 0)
+                          const totalMerma = (reporte.premium?.mermaVolumen || 0) + 
+                                           (reporte.magna?.mermaVolumen || 0) + 
+                                           (reporte.diesel?.mermaVolumen || 0)
+                          const totalPesos = (reporte.premium?.mermaImporte || 0) + 
+                                           (reporte.magna?.mermaImporte || 0) + 
+                                           (reporte.diesel?.mermaImporte || 0)
                           
                           return (
                             <tr key={reporte.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2632] transition-colors">
                               <td className="px-3 py-2 font-medium text-[#111418] dark:text-white">{dia}</td>
-                              <td className="px-3 py-2 text-right">{formatNumber(reporte.premium?.merma_volumen)}</td>
-                              <td className="px-3 py-2 text-right">{formatNumber(reporte.magna?.merma_volumen)}</td>
-                              <td className="px-3 py-2 text-right">{formatNumber(reporte.diesel?.merma_volumen)}</td>
+                              <td className="px-3 py-2 text-right">{formatNumber(reporte.premium?.mermaVolumen)}</td>
+                              <td className="px-3 py-2 text-right">{formatNumber(reporte.magna?.mermaVolumen)}</td>
+                              <td className="px-3 py-2 text-right">{formatNumber(reporte.diesel?.mermaVolumen)}</td>
                               <td className="px-3 py-2 text-right font-semibold bg-gray-50 dark:bg-[#1a2632]">{formatNumber(totalMerma)}</td>
                               {mostrarPrecios && (
                                 <>
@@ -384,18 +402,54 @@ export default function ReporteEficiencia() {
                                   </td>
                                 </>
                               )}
-                              <td className="px-3 py-2 text-right">${formatNumber(reporte.premium?.merma_importe)}</td>
-                              <td className="px-3 py-2 text-right">${formatNumber(reporte.magna?.merma_importe)}</td>
-                              <td className="px-3 py-2 text-right">${formatNumber(reporte.diesel?.merma_importe)}</td>
+                              <td className="px-3 py-2 text-right">${formatNumber(reporte.premium?.mermaImporte)}</td>
+                              <td className="px-3 py-2 text-right">${formatNumber(reporte.magna?.mermaImporte)}</td>
+                              <td className="px-3 py-2 text-right">${formatNumber(reporte.diesel?.mermaImporte)}</td>
                               <td className="px-3 py-2 text-right font-semibold bg-gray-50 dark:bg-[#1a2632]">${formatNumber(totalPesos)}</td>
-                              <td className={`px-3 py-2 text-right font-semibold ${(reporte.premium?.eficiencia_real_porcentaje || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatPercentage(reporte.premium?.eficiencia_real_porcentaje)}
+                              <td className={`px-3 py-2 text-right font-semibold ${(() => {
+                                const merma = reporte.premium?.mermaVolumen || 0
+                                const litros = reporte.premium?.litros || 0
+                                const v = litros - merma
+                                const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+                                return porcentaje >= 0 ? 'text-green-600' : 'text-red-600'
+                              })()}`}>
+                                {(() => {
+                                  const merma = reporte.premium?.mermaVolumen || 0
+                                  const litros = reporte.premium?.litros || 0
+                                  const v = litros - merma
+                                  const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+                                  return formatPercentage(porcentaje)
+                                })()}
                               </td>
-                              <td className={`px-3 py-2 text-right font-semibold ${(reporte.magna?.eficiencia_real_porcentaje || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatPercentage(reporte.magna?.eficiencia_real_porcentaje)}
+                              <td className={`px-3 py-2 text-right font-semibold ${(() => {
+                                const merma = reporte.magna?.mermaVolumen || 0
+                                const litros = reporte.magna?.litros || 0
+                                const v = litros - merma
+                                const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+                                return porcentaje >= 0 ? 'text-green-600' : 'text-red-600'
+                              })()}`}>
+                                {(() => {
+                                  const merma = reporte.magna?.mermaVolumen || 0
+                                  const litros = reporte.magna?.litros || 0
+                                  const v = litros - merma
+                                  const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+                                  return formatPercentage(porcentaje)
+                                })()}
                               </td>
-                              <td className={`px-3 py-2 text-right font-semibold ${(reporte.diesel?.eficiencia_real_porcentaje || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {formatPercentage(reporte.diesel?.eficiencia_real_porcentaje)}
+                              <td className={`px-3 py-2 text-right font-semibold ${(() => {
+                                const merma = reporte.diesel?.mermaVolumen || 0
+                                const litros = reporte.diesel?.litros || 0
+                                const v = litros - merma
+                                const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+                                return porcentaje >= 0 ? 'text-green-600' : 'text-red-600'
+                              })()}`}>
+                                {(() => {
+                                  const merma = reporte.diesel?.mermaVolumen || 0
+                                  const litros = reporte.diesel?.litros || 0
+                                  const v = litros - merma
+                                  const porcentaje = v !== 0 ? (merma / v) * 100 : 0
+                                  return formatPercentage(porcentaje)
+                                })()}
                               </td>
                             </tr>
                           )

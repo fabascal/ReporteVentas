@@ -11,6 +11,7 @@ interface FilaExcel {
   cct?: number
   v_dsc?: number
   iffb?: number
+  aceites?: number
 }
 
 export const importExcelController = {
@@ -126,6 +127,7 @@ export const importExcelController = {
               cct: parsearNumero(fila['CCT'] || fila['cct'] || fila['C.C.T.']),
               v_dsc: parsearNumero(fila['V.DSC'] || fila['v.dsc'] || fila['V DSC'] || fila['VDSC']),
               iffb: parsearNumero(fila['IFFB'] || fila['iffb'] || fila['I.F.F.B.']),
+              aceites: parsearNumero(fila['Aceites'] || fila['aceites'] || fila['ACEITES']),
             })
           }
 
@@ -154,6 +156,16 @@ export const importExcelController = {
             }
 
             const reporteId = reporteResult.rows[0].id
+
+            // Actualizar aceites en el reporte (solo una vez, del primer producto)
+            const primeraFila = filas[0]
+            if (primeraFila?.aceites !== undefined) {
+              await pool.query(
+                'UPDATE reportes SET aceites = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+                [primeraFila.aceites, reporteId]
+              )
+              console.log(`[IMPORT] Aceites actualizado: ${primeraFila.aceites}`)
+            }
 
             // Actualizar cada producto del reporte
             for (const fila of filas) {

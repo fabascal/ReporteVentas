@@ -87,18 +87,18 @@ export default function ReporteVtas() {
     return reportes.reduce((acc, reporte) => {
       const producto = reporte[productoSeleccionado]
       if (producto) {
-        acc.litros += producto.litros_vendidos || 0
-        acc.mermaVolumen += producto.merma_volumen || 0
-        acc.iib += producto.inventario_inicial || 0
+        acc.litros += producto.litros || 0
+        acc.mermaVolumen += producto.mermaVolumen || 0
+        acc.iib += producto.iib || 0
         acc.compras += producto.compras || 0
         acc.cct += producto.cct || 0
-        acc.vDsc += producto.v_dsc || 0
+        acc.vDsc += producto.vDsc || 0
         acc.dc += producto.dc || 0
-        acc.difVDsc += producto.dif_v_dsc || 0
-        acc.v += producto.litros_vendidos || 0
-        acc.iffb += producto.inventario_final || 0
-        acc.eficienciaReal += producto.eficiencia_real || 0
-        acc.eficienciaImporte += producto.eficiencia_importe || 0
+        acc.difVDsc += producto.difVDsc || 0
+        acc.v += (producto.litros || 0) - (producto.mermaVolumen || 0)
+        acc.iffb += producto.iffb || 0
+        acc.eficienciaReal += producto.eficienciaReal || 0
+        acc.eficienciaImporte += producto.eficienciaImporte || 0
       }
       return acc
     }, {
@@ -111,11 +111,11 @@ export default function ReporteVtas() {
 
   // Calcular promedios para porcentajes
   const promedioER = reportes.length > 0
-    ? reportes.reduce((sum, r) => sum + (r[productoSeleccionado]?.eficiencia_real_porcentaje || 0), 0) / reportes.length
+    ? reportes.reduce((sum, r) => sum + (r[productoSeleccionado]?.eficienciaRealPorcentaje || 0), 0) / reportes.length
     : 0
 
   const promedioMerma = reportes.length > 0
-    ? reportes.reduce((sum, r) => sum + (r[productoSeleccionado]?.merma_porcentaje || 0), 0) / reportes.length
+    ? reportes.reduce((sum, r) => sum + (r[productoSeleccionado]?.mermaPorcentaje || 0), 0) / reportes.length
     : 0
 
   return (
@@ -294,29 +294,39 @@ export default function ReporteVtas() {
                           <td className="px-3 py-2 font-medium text-[#111418] dark:text-white">
                             {new Date(reporte.fecha).getDate()} {getMesNombre(mes).substring(0, 3).toLowerCase()}
                           </td>
-                          <td className="px-3 py-2 text-right">{formatNumber(producto.litros_vendidos)}</td>
-                          <td className={`px-3 py-2 text-right ${producto.merma_volumen < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.merma_volumen)}</td>
+                          <td className="px-3 py-2 text-right">{formatNumber(producto.litros)}</td>
+                          <td className={`px-3 py-2 text-right ${(producto.mermaVolumen || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.mermaVolumen)}</td>
                           <td className="px-3 py-2 text-right">${formatNumber(producto.precio)}</td>
-                          <td className="px-3 py-2 text-right">{formatNumber(producto.inventario_inicial)}</td>
+                          <td className="px-3 py-2 text-right">{formatNumber(producto.iib)}</td>
                           <td className="px-3 py-2 text-right">{formatNumber(producto.compras)}</td>
                           <td className="px-3 py-2 text-right">{formatNumber(producto.cct)}</td>
-                          <td className="px-3 py-2 text-right">{formatNumber(producto.v_dsc)}</td>
-                          <td className={`px-3 py-2 text-right ${producto.dc < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.dc)}</td>
-                          <td className={`px-3 py-2 text-right ${producto.dif_v_dsc < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.dif_v_dsc)}</td>
-                          <td className="px-3 py-2 text-right">{formatNumber(producto.litros_vendidos)}</td>
-                          <td className="px-3 py-2 text-right">{formatNumber(0)}</td>
-                          <td className="px-3 py-2 text-right">{formatNumber(producto.inventario_final)}</td>
-                          <td className={`px-3 py-2 text-right ${producto.eficiencia_real < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.eficiencia_real)}</td>
-                          <td className={`px-3 py-2 text-right font-semibold ${producto.eficiencia_real_porcentaje >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            {formatNumber(producto.eficiencia_real_porcentaje)}%
+                          <td className="px-3 py-2 text-right">{formatNumber(producto.vDsc)}</td>
+                          <td className={`px-3 py-2 text-right ${(producto.dc || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.dc)}</td>
+                          <td className={`px-3 py-2 text-right ${(producto.difVDsc || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.difVDsc)}</td>
+                          <td className="px-3 py-2 text-right">{formatNumber((producto.litros || 0) - (producto.mermaVolumen || 0))}</td>
+                          <td className="px-3 py-2 text-right">{formatNumber(producto.if)}</td>
+                          <td className="px-3 py-2 text-right">{formatNumber(producto.iffb)}</td>
+                          <td className={`px-3 py-2 text-right ${(producto.eficienciaReal || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.eficienciaReal)}</td>
+                          <td className={`px-3 py-2 text-right font-semibold ${(producto.eficienciaRealPorcentaje || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {formatNumber(producto.eficienciaRealPorcentaje)}%
                           </td>
-                          <td className={`px-3 py-2 text-right ${producto.merma_volumen < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.merma_volumen)}</td>
-                          <td className={`px-3 py-2 text-right ${producto.merma_porcentaje < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.merma_porcentaje)}%</td>
-                          <td className={`px-3 py-2 text-right font-semibold ${(producto.eficiencia_real - producto.merma_volumen) < 0 ? 'text-red-600' : ''}`}>
-                            {formatNumber(producto.eficiencia_real - producto.merma_volumen)}
+                          <td className={`px-3 py-2 text-right ${(producto.mermaVolumen || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.mermaVolumen)}</td>
+                          <td className={`px-3 py-2 text-right ${(producto.mermaPorcentaje || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.mermaPorcentaje)}%</td>
+                          <td className={`px-3 py-2 text-right font-semibold ${((producto.eficienciaReal || 0) - (producto.mermaVolumen || 0)) < 0 ? 'text-red-600' : ''}`}>
+                            {formatNumber((producto.eficienciaReal || 0) - (producto.mermaVolumen || 0))}
                           </td>
-                          <td className={`px-3 py-2 text-right font-semibold ${((producto.eficiencia_real - producto.merma_volumen) / (producto.litros_vendidos - producto.merma_volumen) * 100) < 0 ? 'text-red-600' : ''}`}>
-                            {formatNumber(((producto.eficiencia_real - producto.merma_volumen) / (producto.litros_vendidos - producto.merma_volumen)) * 100)}%
+                          <td className={`px-3 py-2 text-right font-semibold ${(() => {
+                            const v = (producto.litros || 0) - (producto.mermaVolumen || 0)
+                            const mas = (producto.eficienciaReal || 0) - (producto.mermaVolumen || 0)
+                            const porcentaje = v !== 0 ? (mas / v) * 100 : 0
+                            return porcentaje < 0 ? 'text-red-600' : ''
+                          })()}`}>
+                            {(() => {
+                              const v = (producto.litros || 0) - (producto.mermaVolumen || 0)
+                              const mas = (producto.eficienciaReal || 0) - (producto.mermaVolumen || 0)
+                              const porcentaje = v !== 0 ? (mas / v) * 100 : 0
+                              return formatNumber(porcentaje)
+                            })()}%
                           </td>
                         </tr>
                       )

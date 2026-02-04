@@ -47,6 +47,25 @@ export const ejerciciosController = {
     }
   },
 
+  // Obtener todos los periodos mensuales disponibles
+  getPeriodosDisponibles: async (req: AuthRequest, res: Response) => {
+    try {
+      const result = await pool.query(`
+        SELECT DISTINCT anio, mes
+        FROM periodos_mensuales
+        ORDER BY anio DESC, mes DESC
+      `);
+
+      res.json({
+        success: true,
+        data: result.rows
+      });
+    } catch (error) {
+      console.error('[getPeriodosDisponibles] Error:', error);
+      res.status(500).json({ error: 'Error al obtener periodos disponibles' });
+    }
+  },
+
   // Crear nuevo ejercicio fiscal
   create: async (req: AuthRequest, res: Response) => {
     try {

@@ -6,15 +6,20 @@ import ejerciciosService from '../services/ejerciciosService';
  * Usado en todos los filtros de fecha del sistema
  */
 export const useEjerciciosActivos = () => {
-  const { data: ejercicios, isLoading, error } = useQuery({
+  const { data: ejerciciosData, isLoading, error } = useQuery({
     queryKey: ['ejercicios-activos'],
     queryFn: () => ejerciciosService.getActivos(),
     staleTime: 1000 * 60 * 30, // Cache por 30 minutos
     refetchOnWindowFocus: false,
   });
 
+  // Asegurar que ejercicios es un array
+  const ejercicios = ejerciciosData?.data || [];
+
   // Extraer solo los años para los selectores
-  const aniosDisponibles = ejercicios?.map(e => e.anio).sort((a, b) => b - a) || [];
+  const aniosDisponibles = Array.isArray(ejercicios)
+    ? ejercicios.map(e => e.anio).sort((a, b) => b - a)
+    : [];
 
   // Verificar si un año específico está activo
   const isAnioActivo = (anio: number) => {

@@ -281,6 +281,30 @@ async function createTables() {
     CREATE INDEX IF NOT EXISTS idx_reportes_auditoria_fecha ON reportes_auditoria(fecha_cambio DESC);
   `)
 
+  // Tabla de auditoría general del sistema (gastos, entregas, cierres, etc.)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sistema_auditoria (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      entidad_tipo VARCHAR(50) NOT NULL,
+      entidad_id UUID,
+      usuario_id UUID REFERENCES users(id),
+      usuario_nombre VARCHAR(255),
+      accion VARCHAR(50) NOT NULL,
+      descripcion TEXT,
+      datos_anteriores JSONB,
+      datos_nuevos JSONB,
+      metadata JSONB,
+      fecha_cambio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+
+  // Crear índices para la tabla de auditoría del sistema
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_sistema_auditoria_entidad ON sistema_auditoria(entidad_tipo, entidad_id);
+    CREATE INDEX IF NOT EXISTS idx_sistema_auditoria_fecha ON sistema_auditoria(fecha_cambio DESC);
+    CREATE INDEX IF NOT EXISTS idx_sistema_auditoria_usuario ON sistema_auditoria(usuario_id);
+  `)
+
   // Configuracion table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS configuracion (

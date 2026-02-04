@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { pool } from '../config/database.js';
+import { registrarAuditoriaGeneral } from '../utils/auditoria.js';
 
 /**
  * Validar si una zona puede cerrar un período
@@ -374,6 +375,31 @@ export const cerrarPeriodo = async (req: Request, res: Response) => {
     `, [zonaIdFinal, periodo.id, usuarioId, observaciones || null]);
     
     await client.query('COMMIT');
+
+    // Obtener nombre de la zona para la auditoría
+    const zonaResult = await pool.query('SELECT nombre FROM zonas WHERE id = $1', [zonaIdFinal]);
+    const nombreZona = zonaResult.rows[0]?.nombre || zonaIdFinal;
+
+    // Registrar en auditoría
+    await registrarAuditoriaGeneral({
+      entidadTipo: 'CIERRE_PERIODO',
+      entidadId: cierreResult.rows[0].id,
+      usuarioId: usuarioId,
+      usuarioNombre: usuario?.name || usuario?.email || 'Usuario',
+      accion: 'CERRAR',
+      descripcion: `Cierre de período ${mes}/${anio} para zona "${nombreZona}". ${estacionesResult.rows.length} estación(es) procesada(s)`,
+      datosNuevos: {
+        zona: nombreZona,
+        periodo: `${mes}/${anio}`,
+        estaciones_procesadas: estacionesResult.rows.length,
+        observaciones: observaciones || null
+      },
+      metadata: {
+        mes,
+        anio,
+        zona_id: zonaIdFinal
+      }
+    });
     
     res.json({
       success: true,
@@ -447,6 +473,29 @@ export const reabrirPeriodo = async (req: Request, res: Response) => {
     `, [zonaId, periodo.id]);
     
     await client.query('COMMIT');
+
+    // Obtener nombre de la zona para la auditoría
+    const zonaResult = await pool.query('SELECT nombre FROM zonas WHERE id = $1', [zonaId]);
+    const nombreZona = zonaResult.rows[0]?.nombre || zonaId;
+
+    // Registrar en auditoría
+    await registrarAuditoriaGeneral({
+      entidadTipo: 'REAPERTURA_PERIODO',
+      entidadId: result.rows[0].id,
+      usuarioId: usuarioId,
+      usuarioNombre: usuario?.name || usuario?.email || 'Usuario',
+      accion: 'REABRIR',
+      descripcion: `Reapertura de período ${mes}/${anio} para zona "${nombreZona}"`,
+      datosNuevos: {
+        zona: nombreZona,
+        periodo: `${mes}/${anio}`
+      },
+      metadata: {
+        mes,
+        anio,
+        zona_id: zonaId
+      }
+    });
     
     res.json({
       success: true,

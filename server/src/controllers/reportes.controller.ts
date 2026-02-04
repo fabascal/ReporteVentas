@@ -3,6 +3,7 @@ import { pool } from '../config/database.js'
 import { AuthRequest } from '../middleware/auth.middleware.js'
 import { EstadoReporte } from '../types/reportes.js'
 import { Role } from '../types/auth.js'
+import { obtenerLogsAuditoria } from '../utils/auditoria.js'
 
 // Función helper para registrar auditoría
 async function registrarAuditoria(
@@ -13,17 +14,76 @@ async function registrarAuditoria(
   campoModificado?: string,
   valorAnterior?: string,
   valorNuevo?: string,
-  descripcion?: string
+  descripcion?: string,
+  fechaReporte?: string
 ) {
   try {
+    // Si no se proporciona fechaReporte, intentar obtenerla del reporte
+    let fechaReporteParaGuardar = fechaReporte
+    if (!fechaReporteParaGuardar) {
+      try {
+        const reporteResult = await pool.query(
+          'SELECT fecha FROM reportes WHERE id = $1',
+          [reporteId]
+        )
+        if (reporteResult.rows.length > 0) {
+          const fecha = reporteResult.rows[0].fecha
+          // Formatear la fecha como YYYY-MM-DD
+          if (fecha instanceof Date) {
+            fechaReporteParaGuardar = fecha.toISOString().split('T')[0]
+          } else if (typeof fecha === 'string') {
+            fechaReporteParaGuardar = fecha.split('T')[0]
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudo obtener fecha del reporte para auditoría:', e)
+      }
+    }
+
+    // Formatear valores si son fechas
+    const formatearValor = (valor: any): string | null => {
+      if (!valor) return null
+      if (typeof valor === 'string') {
+        // Si es una fecha en formato ISO, extraer solo la fecha
+        if (valor.match(/^\d{4}-\d{2}-\d{2}T/)) {
+          return valor.split('T')[0]
+        }
+        // Si es un objeto Date serializado (contiene "GMT"), limpiar
+        if (valor.includes('GMT')) {
+          try {
+            const date = new Date(valor)
+            if (!isNaN(date.getTime())) {
+              return date.toISOString().split('T')[0]
+            }
+          } catch (e) {
+            // Si no se puede parsear, devolver el valor original
+          }
+        }
+      }
+      return String(valor)
+    }
+
+    const valorAnteriorFormateado = formatearValor(valorAnterior)
+    const valorNuevoFormateado = formatearValor(valorNuevo)
+
     await pool.query(
       `
       INSERT INTO reportes_auditoria (
         reporte_id, usuario_id, usuario_nombre, accion, 
-        campo_modificado, valor_anterior, valor_nuevo, descripcion
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        campo_modificado, valor_anterior, valor_nuevo, descripcion, fecha_reporte
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `,
-      [reporteId, usuarioId, usuarioNombre, accion, campoModificado || null, valorAnterior || null, valorNuevo || null, descripcion || null]
+      [
+        reporteId,
+        usuarioId,
+        usuarioNombre,
+        accion,
+        campoModificado || null,
+        valorAnteriorFormateado,
+        valorNuevoFormateado,
+        descripcion || null,
+        fechaReporteParaGuardar || null
+      ]
     )
   } catch (error) {
     console.error('Error al registrar auditoría:', error)
@@ -108,13 +168,42 @@ async function guardarProductosReporte(
     }
 
     // Validar y convertir valores a números
+    // Calcular valores derivados
+    const litros = parseFloat((datos.litros || 0).toString()) || 0
+    const mermaVolumen = parseFloat((datos.mermaVolumen || 0).toString()) || 0
+    const precio = parseFloat((datos.precio || 0).toString()) || 0
+    const iib = parseFloat((datos.iib || 0).toString()) || 0
+    const compras = parseFloat((datos.compras || 0).toString()) || 0
+    const cct = parseFloat((datos.cct || 0).toString()) || 0
+    const iffb = parseFloat((datos.iffb || 0).toString()) || 0
+    
+    // IF = (IIB + CCT) - LTS
+    const iif = (iib + cct) - litros
+    
+    // ER = IFFB - IF
+    const eficienciaReal = iffb - iif
+    
+    // ER$ = ER * Precio
+    const eficienciaImporte = eficienciaReal * precio
+    
+    // V = LTS - Merma Vol
+    const v = litros - mermaVolumen
+    
+    // ER% = ER / (V + Merma Vol) pero limitado para evitar overflow
+    let eficienciaRealPorcentaje = 0
+    if ((v + mermaVolumen) !== 0) {
+      const porcentaje = (eficienciaReal / (v + mermaVolumen)) * 100
+      // Limitar a rango válido para numeric(8,4): -9999.9999 a 9999.9999
+      eficienciaRealPorcentaje = Math.max(-9999.9999, Math.min(9999.9999, porcentaje))
+    }
+
     const valores = [
       reporteId,
       productoId,
-      parseFloat((datos.precio || 0).toString()) || 0,
-      parseFloat((datos.litros || 0).toString()) || 0,
+      precio,
+      litros,
       parseFloat((datos.importe || 0).toString()) || 0,
-      parseFloat((datos.mermaVolumen || 0).toString()) || 0,
+      mermaVolumen,
       parseFloat((datos.mermaImporte || 0).toString()) || 0,
       parseFloat((datos.mermaPorcentaje || 0).toString()) || 0,
       parseFloat((datos.iib || 0).toString()) || 0,
@@ -123,8 +212,11 @@ async function guardarProductosReporte(
       parseFloat((datos.vDsc || 0).toString()) || 0,
       parseFloat((datos.dc || 0).toString()) || 0,
       parseFloat((datos.difVDsc || 0).toString()) || 0,
-      parseFloat((datos.if || 0).toString()) || 0,
-      parseFloat((datos.iffb || 0).toString()) || 0,
+      iif,
+      iffb,
+      eficienciaReal,
+      eficienciaImporte,
+      eficienciaRealPorcentaje,
     ]
 
     await pool.query(
@@ -132,8 +224,9 @@ async function guardarProductosReporte(
       INSERT INTO reporte_productos (
         reporte_id, producto_id, precio, litros, importe,
         merma_volumen, merma_importe, merma_porcentaje,
-        iib, compras, cct, v_dsc, dc, dif_v_dsc, if, iffb, fecha
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, (SELECT fecha FROM reportes WHERE id = $1))
+        iib, compras, cct, v_dsc, dc, dif_v_dsc, if, iffb,
+        eficiencia_real, eficiencia_importe, eficiencia_real_porcentaje, fecha
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, (SELECT fecha FROM reportes WHERE id = $1))
       ON CONFLICT (reporte_id, producto_id, fecha) DO UPDATE SET
         precio = EXCLUDED.precio,
         litros = EXCLUDED.litros,
@@ -149,6 +242,9 @@ async function guardarProductosReporte(
         dif_v_dsc = EXCLUDED.dif_v_dsc,
         if = EXCLUDED.if,
         iffb = EXCLUDED.iffb,
+        eficiencia_real = EXCLUDED.eficiencia_real,
+        eficiencia_importe = EXCLUDED.eficiencia_importe,
+        eficiencia_real_porcentaje = EXCLUDED.eficiencia_real_porcentaje,
         updated_at = CURRENT_TIMESTAMP
       `,
       valores
@@ -666,7 +762,8 @@ export const reportesController = {
         undefined,
         undefined,
         undefined,
-        `Reporte creado para estación "${estacionNombre}" con fecha ${fecha}. Premium: ${premium.litros}L @ $${premium.precio}, Magna: ${magna.litros}L @ $${magna.precio}, Diesel: ${diesel.litros}L @ $${diesel.precio}`
+        `Reporte creado para estación "${estacionNombre}" con fecha ${fecha}. Premium: ${premium.litros}L @ $${premium.precio}, Magna: ${magna.litros}L @ $${magna.precio}, Diesel: ${diesel.litros}L @ $${diesel.precio}`,
+        fecha
       )
 
       // Obtener información completa del reporte
@@ -796,14 +893,14 @@ export const reportesController = {
           })
         }
 
-        // Solo puede cambiar a EnRevision (aprobado) o Rechazado
-        if (estado !== EstadoReporte.Pendiente && estado !== EstadoReporte.Rechazado) {
-          return res.status(400).json({ message: 'Solo puedes aprobar (EnRevision) o rechazar el reporte' })
+        // Gerente de Estación puede aprobar o rechazar sus propios reportes
+        if (estado !== EstadoReporte.Aprobado && estado !== EstadoReporte.Rechazado) {
+          return res.status(400).json({ message: 'Solo puedes aprobar o rechazar el reporte' })
         }
       } else if (req.user.role === 'GerenteZona') {
-        // Gerente de Zona solo puede aprobar o rechazar reportes EnRevision de sus zonas
-        if (estadoActual !== EstadoReporte.Pendiente) {
-          return res.status(403).json({ message: 'Solo puedes aprobar o rechazar reportes en revisión' })
+        // Gerente de Zona puede rechazar reportes aprobados si encuentra errores
+        if (estadoActual !== EstadoReporte.Aprobado) {
+          return res.status(403).json({ message: 'Solo puedes rechazar reportes aprobados para corrección' })
         }
 
         // Verificar que el usuario tenga acceso a la zona
@@ -816,9 +913,9 @@ export const reportesController = {
           return res.status(403).json({ message: 'No tienes acceso a esta zona' })
         }
 
-        // Solo puede cambiar a Aprobado o Rechazado
-        if (estado !== EstadoReporte.Aprobado && estado !== EstadoReporte.Rechazado) {
-          return res.status(400).json({ message: 'Solo puedes aprobar o rechazar el reporte' })
+        // Solo puede rechazar (para que el Gerente de Estación corrija)
+        if (estado !== EstadoReporte.Rechazado) {
+          return res.status(400).json({ message: 'Solo puedes rechazar el reporte para solicitar correcciones' })
         }
       } else if (req.user.role === 'Direccion') {
         // Director solo puede ver, no puede cambiar estados
@@ -1285,7 +1382,8 @@ export const reportesController = {
             'Múltiples campos',
             undefined,
             undefined,
-            `Reporte actualizado por ${req.user.name || req.user.email}. Cambios: ${cambios.join('; ')}`
+            `Reporte actualizado por ${req.user.name || req.user.email}. Cambios: ${cambios.join('; ')}`,
+            fecha
           )
         } else {
           // Registrar un log por cada campo que cambió (máximo 5 para no saturar)
@@ -1301,7 +1399,8 @@ export const reportesController = {
               campo.trim(),
               valorAnterior.trim(),
               valorNuevo.trim(),
-              `Campo "${campo.trim()}" actualizado`
+              `Campo "${campo.trim()}" actualizado`,
+              fecha
             )
           }
         }
@@ -1315,7 +1414,8 @@ export const reportesController = {
           undefined,
           undefined,
           undefined,
-          `Reporte actualizado por ${req.user.name || req.user.email} (sin cambios detectados)`
+          `Reporte actualizado por ${req.user.name || req.user.email} (sin cambios detectados)`,
+          fecha
         )
       }
 
@@ -1650,7 +1750,8 @@ export const reportesController = {
           valor_anterior,
           valor_nuevo,
           descripcion,
-          fecha_cambio
+          fecha_cambio,
+          fecha_reporte
         FROM reportes_auditoria
         WHERE reporte_id = $1
         ORDER BY fecha_cambio DESC
@@ -1669,6 +1770,7 @@ export const reportesController = {
         valorNuevo: row.valor_nuevo,
         descripcion: row.descripcion,
         fechaCambio: row.fecha_cambio,
+        fechaReporte: row.fecha_reporte,
       }))
 
       res.json(auditoria)
@@ -1763,6 +1865,7 @@ export const reportesController = {
           a.valor_nuevo,
           a.descripcion,
           a.fecha_cambio,
+          a.fecha_reporte,
           r.estacion_id,
           e.nombre as estacion_nombre
         FROM reportes_auditoria a
@@ -1795,6 +1898,7 @@ export const reportesController = {
         valorNuevo: row.valor_nuevo,
         descripcion: row.descripcion,
         fechaCambio: row.fecha_cambio,
+        fechaReporte: row.fecha_reporte,
         estacionId: row.estacion_id,
         estacionNombre: row.estacion_nombre,
       }))
@@ -1810,6 +1914,40 @@ export const reportesController = {
       })
     } catch (error) {
       console.error('Error al obtener logs:', error)
+      res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async getLogsSistema(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'No autenticado' })
+      }
+
+      // Solo Administrador puede ver todos los logs
+      if (req.user.role !== 'Administrador') {
+        return res.status(403).json({ message: 'No autorizado' })
+      }
+
+      // Parámetros de paginación
+      const page = parseInt(req.query.page as string) || 1
+      const limit = parseInt(req.query.limit as string) || 20
+
+      // Filtros
+      const filtros = {
+        entidadTipo: req.query.entidadTipo as string | undefined,
+        usuarioId: req.query.usuarioId as string | undefined,
+        accion: req.query.accion as string | undefined,
+        fechaDesde: req.query.fechaDesde as string | undefined,
+        fechaHasta: req.query.fechaHasta as string | undefined,
+        busqueda: req.query.busqueda as string | undefined,
+      }
+
+      const result = await obtenerLogsAuditoria(page, limit, filtros)
+
+      res.json(result)
+    } catch (error) {
+      console.error('Error al obtener logs del sistema:', error)
       res.status(500).json({ message: 'Error interno del servidor' })
     }
   },

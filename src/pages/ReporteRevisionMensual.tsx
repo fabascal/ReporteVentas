@@ -153,7 +153,8 @@ export default function ReporteRevisionMensual() {
     const acumulados = {
       premium: { er: 0, erImporte: 0, e: 0, eImporte: 0, v: 0 },
       magna: { er: 0, erImporte: 0, e: 0, eImporte: 0, v: 0 },
-      diesel: { er: 0, erImporte: 0, e: 0, eImporte: 0, v: 0 }
+      diesel: { er: 0, erImporte: 0, e: 0, eImporte: 0, v: 0 },
+      aceites: 0
     }
 
     dias.forEach(dia => {
@@ -215,6 +216,9 @@ export default function ReporteRevisionMensual() {
         acumulados.diesel.eImporte += dia.reporte.diesel.mermaImporte || 0
         acumulados.diesel.v += lts - (dia.reporte.diesel.mermaVolumen || 0)
       }
+
+      // Sumar aceites
+      acumulados.aceites += dia.reporte.aceites || 0
     })
 
     // Calcular + y %
@@ -242,7 +246,8 @@ export default function ReporteRevisionMensual() {
         ...calcularMasYPorcentaje('diesel'),
         erPorcentaje: acumulados.diesel.v !== 0 ? (acumulados.diesel.er / (acumulados.diesel.v + acumulados.diesel.e)) * 100 : 0,
         ePorcentaje: (acumulados.diesel.v + acumulados.diesel.e) !== 0 ? (acumulados.diesel.e / (acumulados.diesel.v + acumulados.diesel.e)) * 100 : 0
-      }
+      },
+      aceites: acumulados.aceites
     }
   }
 
@@ -251,10 +256,11 @@ export default function ReporteRevisionMensual() {
   // Mutación para actualizar estado
   const updateEstadoMutation = useMutation({
     mutationFn: async ({ reporteId, nuevoEstado }: { reporteId: string; nuevoEstado: EstadoReporte }) => {
-      return await reportesService.updateEstado(reporteId, nuevoEstado)
+      return await reportesService.updateEstado(reporteId, { estado: nuevoEstado })
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
+      await refetch()
       toast.success('Estado actualizado correctamente')
     },
     onError: (error: any) => {
@@ -267,8 +273,9 @@ export default function ReporteRevisionMensual() {
     mutationFn: async ({ reporteId, data }: { reporteId: string; data: any }) => {
       return await reportesService.updateReporte(reporteId, data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
+      await refetch()
       toast.success('Reporte actualizado correctamente')
     },
     onError: (error: any) => {
@@ -281,8 +288,9 @@ export default function ReporteRevisionMensual() {
     mutationFn: async (data: any) => {
       return await reportesService.createReporte(data)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
+      await refetch()
       toast.success('Reporte creado correctamente')
     },
     onError: (error: any) => {
@@ -372,6 +380,9 @@ export default function ReporteRevisionMensual() {
           aceites: reporte.aceites || 0,
           productos: {
             premium: {
+              precio: reporte.premium?.precio || 0,
+              litros: reporte.premium?.litros || 0,
+              mermaVolumen: reporte.premium?.mermaVolumen || 0,
               iib: getIIB(dia, reporte, dias, 'premium'),
               compras: reporte.premium?.compras || 0,
               cct: reporte.premium?.cct || 0,
@@ -379,6 +390,9 @@ export default function ReporteRevisionMensual() {
               iffb: reporte.premium?.iffb || 0,
             },
             magna: {
+              precio: reporte.magna?.precio || 0,
+              litros: reporte.magna?.litros || 0,
+              mermaVolumen: reporte.magna?.mermaVolumen || 0,
               iib: getIIB(dia, reporte, dias, 'magna'),
               compras: reporte.magna?.compras || 0,
               cct: reporte.magna?.cct || 0,
@@ -386,6 +400,9 @@ export default function ReporteRevisionMensual() {
               iffb: reporte.magna?.iffb || 0,
             },
             diesel: {
+              precio: reporte.diesel?.precio || 0,
+              litros: reporte.diesel?.litros || 0,
+              mermaVolumen: reporte.diesel?.mermaVolumen || 0,
               iib: getIIB(dia, reporte, dias, 'diesel'),
               compras: reporte.diesel?.compras || 0,
               cct: reporte.diesel?.cct || 0,
@@ -488,8 +505,9 @@ export default function ReporteRevisionMensual() {
             fecha: reporteOriginal.fecha,
             aceites: valores.aceites ?? reporteOriginal.aceites,
             premium: {
-              precio: reporteOriginal.premium?.precio ?? 0,
-              litros: reporteOriginal.premium?.litros ?? 0,
+              precio: valores.productos.premium?.precio ?? reporteOriginal.premium?.precio ?? 0,
+              litros: valores.productos.premium?.litros ?? reporteOriginal.premium?.litros ?? 0,
+              mermaVolumen: valores.productos.premium?.mermaVolumen ?? reporteOriginal.premium?.mermaVolumen ?? 0,
               iib: valores.productos.premium?.iib ?? reporteOriginal.premium?.iib,
               compras: valores.productos.premium?.compras ?? reporteOriginal.premium?.compras,
               cct: valores.productos.premium?.cct ?? reporteOriginal.premium?.cct,
@@ -497,8 +515,9 @@ export default function ReporteRevisionMensual() {
               iffb: valores.productos.premium?.iffb ?? reporteOriginal.premium?.iffb,
             },
             magna: {
-              precio: reporteOriginal.magna?.precio ?? 0,
-              litros: reporteOriginal.magna?.litros ?? 0,
+              precio: valores.productos.magna?.precio ?? reporteOriginal.magna?.precio ?? 0,
+              litros: valores.productos.magna?.litros ?? reporteOriginal.magna?.litros ?? 0,
+              mermaVolumen: valores.productos.magna?.mermaVolumen ?? reporteOriginal.magna?.mermaVolumen ?? 0,
               iib: valores.productos.magna?.iib ?? reporteOriginal.magna?.iib,
               compras: valores.productos.magna?.compras ?? reporteOriginal.magna?.compras,
               cct: valores.productos.magna?.cct ?? reporteOriginal.magna?.cct,
@@ -506,8 +525,9 @@ export default function ReporteRevisionMensual() {
               iffb: valores.productos.magna?.iffb ?? reporteOriginal.magna?.iffb,
             },
             diesel: {
-              precio: reporteOriginal.diesel?.precio ?? 0,
-              litros: reporteOriginal.diesel?.litros ?? 0,
+              precio: valores.productos.diesel?.precio ?? reporteOriginal.diesel?.precio ?? 0,
+              litros: valores.productos.diesel?.litros ?? reporteOriginal.diesel?.litros ?? 0,
+              mermaVolumen: valores.productos.diesel?.mermaVolumen ?? reporteOriginal.diesel?.mermaVolumen ?? 0,
               iib: valores.productos.diesel?.iib ?? reporteOriginal.diesel?.iib,
               compras: valores.productos.diesel?.compras ?? reporteOriginal.diesel?.compras,
               cct: valores.productos.diesel?.cct ?? reporteOriginal.diesel?.cct,
@@ -566,8 +586,9 @@ export default function ReporteRevisionMensual() {
           fecha: reporteOriginal.fecha,
           aceites: valoresIniciales.aceites ?? reporteOriginal.aceites,
           premium: {
-            precio: reporteOriginal.premium?.precio ?? 0,
-            litros: reporteOriginal.premium?.litros ?? 0,
+            precio: valoresIniciales.productos.premium?.precio ?? reporteOriginal.premium?.precio ?? 0,
+            litros: valoresIniciales.productos.premium?.litros ?? reporteOriginal.premium?.litros ?? 0,
+            mermaVolumen: valoresIniciales.productos.premium?.mermaVolumen ?? reporteOriginal.premium?.mermaVolumen ?? 0,
             iib: valoresIniciales.productos.premium?.iib ?? reporteOriginal.premium?.iib,
             compras: valoresIniciales.productos.premium?.compras ?? reporteOriginal.premium?.compras,
             cct: valoresIniciales.productos.premium?.cct ?? reporteOriginal.premium?.cct,
@@ -575,8 +596,9 @@ export default function ReporteRevisionMensual() {
             iffb: valoresIniciales.productos.premium?.iffb ?? reporteOriginal.premium?.iffb,
           },
           magna: {
-            precio: reporteOriginal.magna?.precio ?? 0,
-            litros: reporteOriginal.magna?.litros ?? 0,
+            precio: valoresIniciales.productos.magna?.precio ?? reporteOriginal.magna?.precio ?? 0,
+            litros: valoresIniciales.productos.magna?.litros ?? reporteOriginal.magna?.litros ?? 0,
+            mermaVolumen: valoresIniciales.productos.magna?.mermaVolumen ?? reporteOriginal.magna?.mermaVolumen ?? 0,
             iib: valoresIniciales.productos.magna?.iib ?? reporteOriginal.magna?.iib,
             compras: valoresIniciales.productos.magna?.compras ?? reporteOriginal.magna?.compras,
             cct: valoresIniciales.productos.magna?.cct ?? reporteOriginal.magna?.cct,
@@ -584,8 +606,9 @@ export default function ReporteRevisionMensual() {
             iffb: valoresIniciales.productos.magna?.iffb ?? reporteOriginal.magna?.iffb,
           },
           diesel: {
-            precio: reporteOriginal.diesel?.precio ?? 0,
-            litros: reporteOriginal.diesel?.litros ?? 0,
+            precio: valoresIniciales.productos.diesel?.precio ?? reporteOriginal.diesel?.precio ?? 0,
+            litros: valoresIniciales.productos.diesel?.litros ?? reporteOriginal.diesel?.litros ?? 0,
+            mermaVolumen: valoresIniciales.productos.diesel?.mermaVolumen ?? reporteOriginal.diesel?.mermaVolumen ?? 0,
             iib: valoresIniciales.productos.diesel?.iib ?? reporteOriginal.diesel?.iib,
             compras: valoresIniciales.productos.diesel?.compras ?? reporteOriginal.diesel?.compras,
             cct: valoresIniciales.productos.diesel?.cct ?? reporteOriginal.diesel?.cct,
@@ -655,6 +678,7 @@ export default function ReporteRevisionMensual() {
             premium: {
               precio: diaPosterior.reporte.premium?.precio ?? 0,
               litros: diaPosterior.reporte.premium?.litros ?? 0,
+              mermaVolumen: diaPosterior.reporte.premium?.mermaVolumen ?? 0,
               iib: iibPremiumAnterior,
               compras: diaPosterior.reporte.premium?.compras,
               cct: diaPosterior.reporte.premium?.cct,
@@ -664,6 +688,7 @@ export default function ReporteRevisionMensual() {
             magna: {
               precio: diaPosterior.reporte.magna?.precio ?? 0,
               litros: diaPosterior.reporte.magna?.litros ?? 0,
+              mermaVolumen: diaPosterior.reporte.magna?.mermaVolumen ?? 0,
               iib: iibMagnaAnterior,
               compras: diaPosterior.reporte.magna?.compras,
               cct: diaPosterior.reporte.magna?.cct,
@@ -673,6 +698,7 @@ export default function ReporteRevisionMensual() {
             diesel: {
               precio: diaPosterior.reporte.diesel?.precio ?? 0,
               litros: diaPosterior.reporte.diesel?.litros ?? 0,
+              mermaVolumen: diaPosterior.reporte.diesel?.mermaVolumen ?? 0,
               iib: iibDieselAnterior,
               compras: diaPosterior.reporte.diesel?.compras,
               cct: diaPosterior.reporte.diesel?.cct,
@@ -736,7 +762,22 @@ export default function ReporteRevisionMensual() {
     })
   }
 
+  // Verificar si todos los días anteriores están aprobados
+  const puedeAprobarDia = (diaActual: number): { puede: boolean; mensaje: string } => {
+    for (let i = 1; i < diaActual; i++) {
+      const diaAnterior = dias.find(d => d.dia === i)
+      if (diaAnterior?.reporte && diaAnterior.reporte.estado !== EstadoReporte.Aprobado) {
+        return {
+          puede: false,
+          mensaje: `Debes aprobar primero el día ${i}`
+        }
+      }
+    }
+    return { puede: true, mensaje: 'Aprobar reporte' }
+  }
+
   const handleAprobar = (reporteId: string) => {
+    // Ambos roles aprueban directamente
     updateEstadoMutation.mutate({ reporteId, nuevoEstado: EstadoReporte.Aprobado })
   }
 
@@ -748,10 +789,50 @@ export default function ReporteRevisionMensual() {
     if (!estacionId) return
     
     toast.loading('Creando reporte...')
+    
     createReporteMutation.mutate({
-      estacion_id: estacionId,
+      estacionId: estacionId,
       fecha: fecha,
-      aceites: 0
+      aceites: 0,
+      premium: {
+        precio: 0,
+        litros: 0,
+        importe: 0,
+        mermaVolumen: 0,
+        mermaImporte: 0,
+        mermaPorcentaje: 0,
+        iib: 0,
+        compras: 0,
+        cct: 0,
+        vDsc: 0,
+        iffb: 0
+      },
+      magna: {
+        precio: 0,
+        litros: 0,
+        importe: 0,
+        mermaVolumen: 0,
+        mermaImporte: 0,
+        mermaPorcentaje: 0,
+        iib: 0,
+        compras: 0,
+        cct: 0,
+        vDsc: 0,
+        iffb: 0
+      },
+      diesel: {
+        precio: 0,
+        litros: 0,
+        importe: 0,
+        mermaVolumen: 0,
+        mermaImporte: 0,
+        mermaPorcentaje: 0,
+        iib: 0,
+        compras: 0,
+        cct: 0,
+        vDsc: 0,
+        iffb: 0
+      }
     })
   }
 
@@ -974,7 +1055,7 @@ export default function ReporteRevisionMensual() {
 
         {/* Acumulados mensuales */}
         {hasConsulted && dias.length > 0 && (
-          <div className="sticky top-0 z-10 bg-white dark:bg-[#1a2632] border-b border-[#e6e8eb] dark:border-slate-700 mb-4 shadow-sm">
+          <div className="sticky top-16 z-10 bg-white dark:bg-[#1a2632] border-b border-[#e6e8eb] dark:border-slate-700 mb-4 shadow-sm">
             <div className="px-4 py-3">
               <div className="flex items-center gap-2 mb-2">
                 <span className="material-symbols-outlined text-lg text-[#111418] dark:text-white">summarize</span>
@@ -1012,7 +1093,7 @@ export default function ReporteRevisionMensual() {
                       <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.mas)}</td>
                       <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.porcentaje)}%</td>
                     </tr>
-                    <tr>
+                    <tr className="border-b border-[#e6e8eb] dark:border-slate-700">
                       <td className="py-1 px-2 text-[#111418] dark:text-white">3 - Diesel</td>
                       <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.er)}</td>
                       <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.erPorcentaje)}%</td>
@@ -1020,6 +1101,10 @@ export default function ReporteRevisionMensual() {
                       <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.ePorcentaje)}%</td>
                       <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.mas)}</td>
                       <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.porcentaje)}%</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1 px-2 font-bold text-[#111418] dark:text-white">Aceites</td>
+                      <td colSpan={6} className="text-right py-1 px-2 font-bold text-[#111418] dark:text-white">${formatNumber(acumuladosMensuales.aceites)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -1042,22 +1127,22 @@ export default function ReporteRevisionMensual() {
                       Fecha
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      1 LTS
+                      1 E
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      ER%
+                      E%
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      2 LTS
+                      2 E
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      ER%
+                      E%
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      3 LTS
+                      3 E
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
-                      ER%
+                      E%
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
                       Aceites
@@ -1113,22 +1198,22 @@ export default function ReporteRevisionMensual() {
                             {dia.dia} {new Date(parseInt(año), parseInt(mes) - 1, dia.dia).toLocaleDateString('es-MX', { month: 'short' })}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
-                            {dia.reporte?.premium ? formatNumber(dia.reporte.premium.litros || 0) : '-'}
+                            {dia.reporte?.premium ? formatNumber(dia.reporte.premium.mermaVolumen || 0) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
-                            {dia.reporte?.premium ? formatNumber(dia.reporte.premium.eficienciaRealPorcentaje || 0) + '%' : '-'}
+                            {dia.reporte?.premium ? formatNumber(dia.reporte.premium.mermaPorcentaje || 0) + '%' : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
-                            {dia.reporte?.magna ? formatNumber(dia.reporte.magna.litros || 0) : '-'}
+                            {dia.reporte?.magna ? formatNumber(dia.reporte.magna.mermaVolumen || 0) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
-                            {dia.reporte?.magna ? formatNumber(dia.reporte.magna.eficienciaRealPorcentaje || 0) + '%' : '-'}
+                            {dia.reporte?.magna ? formatNumber(dia.reporte.magna.mermaPorcentaje || 0) + '%' : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
-                            {dia.reporte?.diesel ? formatNumber(dia.reporte.diesel.litros || 0) : '-'}
+                            {dia.reporte?.diesel ? formatNumber(dia.reporte.diesel.mermaVolumen || 0) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
-                            {dia.reporte?.diesel ? formatNumber(dia.reporte.diesel.eficienciaRealPorcentaje || 0) + '%' : '-'}
+                            {dia.reporte?.diesel ? formatNumber(dia.reporte.diesel.mermaPorcentaje || 0) + '%' : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
                             {dia.reporte ? (
@@ -1184,10 +1269,17 @@ export default function ReporteRevisionMensual() {
                                   </button>
                                   <button
                                     onClick={() => handleAprobar(dia.reporte!.id)}
-                                    className="flex items-center justify-center w-9 h-9 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-all shadow-sm hover:shadow-md"
-                                    title="Aprobar reporte"
+                                    disabled={!puedeAprobarDia(dia.dia).puede}
+                                    className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all shadow-sm ${
+                                      puedeAprobarDia(dia.dia).puede
+                                        ? 'bg-green-500 text-white hover:bg-green-600 hover:shadow-md cursor-pointer'
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-50'
+                                    }`}
+                                    title={puedeAprobarDia(dia.dia).mensaje}
                                   >
-                                    <span className="material-symbols-outlined text-xl">check_circle</span>
+                                    <span className="material-symbols-outlined text-xl">
+                                      {puedeAprobarDia(dia.dia).puede ? 'check_circle' : 'lock'}
+                                    </span>
                                   </button>
                                   <button
                                     onClick={() => handleRechazar(dia.reporte!.id)}
@@ -1286,9 +1378,9 @@ export default function ReporteRevisionMensual() {
                                     {dia.reporte.premium && (
                                       <tr className="border-b border-gray-100 dark:border-gray-800">
                                         <td className="px-2 py-2 font-medium">1</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.premium.litros)}</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.premium.mermaVolumen)}</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.premium.precio)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'premium', 'litros', dia.reporte.premium.litros, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'premium', 'mermaVolumen', dia.reporte.premium.mermaVolumen, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'premium', 'precio', dia.reporte.premium.precio, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
                                         <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.premium.mermaVolumen * dia.reporte.premium.precio)}</td>
                                         <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'premium', 'iib', dia.reporte.premium.iib, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
                                         <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'premium', 'compras', dia.reporte.premium.compras, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
@@ -1318,9 +1410,9 @@ export default function ReporteRevisionMensual() {
                                     {dia.reporte.magna && (
                                       <tr className="border-b border-gray-100 dark:border-gray-800">
                                         <td className="px-2 py-2 font-medium">2</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.magna.litros)}</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.magna.mermaVolumen)}</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.magna.precio)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'magna', 'litros', dia.reporte.magna.litros, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'magna', 'mermaVolumen', dia.reporte.magna.mermaVolumen, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'magna', 'precio', dia.reporte.magna.precio, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
                                         <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.magna.mermaVolumen * dia.reporte.magna.precio)}</td>
                                         <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'magna', 'iib', dia.reporte.magna.iib, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
                                         <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'magna', 'compras', dia.reporte.magna.compras, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
@@ -1350,9 +1442,9 @@ export default function ReporteRevisionMensual() {
                                     {dia.reporte.diesel && (
                                       <tr>
                                         <td className="px-2 py-2 font-medium">3</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.diesel.litros)}</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.diesel.mermaVolumen)}</td>
-                                        <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.diesel.precio)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'diesel', 'litros', dia.reporte.diesel.litros, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'diesel', 'mermaVolumen', dia.reporte.diesel.mermaVolumen, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
+                                        <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'diesel', 'precio', dia.reporte.diesel.precio, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
                                         <td className="px-2 py-2 text-right">{formatNumber(dia.reporte.diesel.mermaVolumen * dia.reporte.diesel.precio)}</td>
                                         <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'diesel', 'iib', dia.reporte.diesel.iib, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>
                                         <td className="px-2 py-2 text-right">{renderField(dia.reporte.id, 'diesel', 'compras', dia.reporte.diesel.compras, esEditable(dia.reporte.id, dia.reporte.estado), dia.dia)}</td>

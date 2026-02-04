@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { reportesService } from '../../services/reportesService'
+import ejerciciosService from '../../services/ejerciciosService'
 import { ReporteVentas } from '../../types/reportes'
 import {
   BarChart,
@@ -36,6 +37,35 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
     const hoy = new Date()
     return hoy.toISOString().split('T')[0]
   })
+
+  // Obtener periodos disponibles
+  const { data: periodosData = [] } = useQuery({
+    queryKey: ['periodos-disponibles'],
+    queryFn: () => ejerciciosService.getPeriodosDisponibles(),
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutos
+    onError: (error) => {
+      console.error('Error al cargar periodos disponibles:', error)
+      // Si falla, el componente usará el fallback (todos los meses/años)
+    }
+  })
+
+  // Obtener años disponibles únicos
+  const añosDisponibles = useMemo(() => {
+    if (!periodosData || !Array.isArray(periodosData)) return []
+    const años = [...new Set(periodosData.map(p => p.anio))]
+    return años.sort((a, b) => b - a)
+  }, [periodosData])
+
+  // Obtener meses disponibles para el año seleccionado
+  const mesesDisponibles = useMemo(() => {
+    if (!periodosData || !Array.isArray(periodosData)) return []
+    const añoActual = new Date(fechaFiltro).getFullYear()
+    return periodosData
+      .filter(p => p.anio === añoActual)
+      .map(p => p.mes)
+      .sort((a, b) => b - a)
+  }, [periodosData, fechaFiltro])
 
   // Obtener estaciones asignadas (solo activas)
   const { data: todasEstaciones = [], isLoading: isLoadingEstaciones } = useQuery({
@@ -105,9 +135,9 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
       }
 
       const datos = agrupados.get(estacionNombre)!
-      datos.Premium += r.premium?.litros_vendidos || 0
-      datos.Magna += r.magna?.litros_vendidos || 0
-      datos.Diesel += r.diesel?.litros_vendidos || 0
+      datos.Premium += r.premium?.litros || 0
+      datos.Magna += r.magna?.litros || 0
+      datos.Diesel += r.diesel?.litros || 0
     })
 
     return Array.from(agrupados.values()).sort((a, b) => {
@@ -143,16 +173,16 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
 
       const datos = agrupados.get(estacionNombre)!
 
-      if (r.premium?.merma_porcentaje !== undefined && r.premium.merma_porcentaje > 0) {
-        datos.Premium.total += r.premium.merma_porcentaje
+      if (r.premium?.mermaPorcentaje !== undefined && r.premium.mermaPorcentaje > 0) {
+        datos.Premium.total += r.premium.mermaPorcentaje
         datos.Premium.count += 1
       }
-      if (r.magna?.merma_porcentaje !== undefined && r.magna.merma_porcentaje > 0) {
-        datos.Magna.total += r.magna.merma_porcentaje
+      if (r.magna?.mermaPorcentaje !== undefined && r.magna.mermaPorcentaje > 0) {
+        datos.Magna.total += r.magna.mermaPorcentaje
         datos.Magna.count += 1
       }
-      if (r.diesel?.merma_porcentaje !== undefined && r.diesel.merma_porcentaje > 0) {
-        datos.Diesel.total += r.diesel.merma_porcentaje
+      if (r.diesel?.mermaPorcentaje !== undefined && r.diesel.mermaPorcentaje > 0) {
+        datos.Diesel.total += r.diesel.mermaPorcentaje
         datos.Diesel.count += 1
       }
     })
@@ -225,9 +255,9 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
   const totales = useMemo(() => {
     return reportesFiltrados.reduce(
       (acc, r) => {
-        acc.premium += r.premium?.litros_vendidos || 0
-        acc.magna += r.magna?.litros_vendidos || 0
-        acc.diesel += r.diesel?.litros_vendidos || 0
+        acc.premium += r.premium?.litros || 0
+        acc.magna += r.magna?.litros || 0
+        acc.diesel += r.diesel?.litros || 0
         acc.aceites += r.aceites || 0
         return acc
       },
@@ -261,19 +291,69 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label htmlFor="fecha-filtro" className="text-sm font-medium text-[#111418] dark:text-white">
+            <label className="text-sm font-medium text-[#111418] dark:text-white">
               Mes:
             </label>
-            <input
-              id="fecha-filtro"
-              type="month"
-              value={fechaFiltro.substring(0, 7)}
+            <select
+              value={new Date(fechaFiltro).getMonth() + 1}
               onChange={(e) => {
-                const fecha = e.target.value + '-01'
-                setFechaFiltro(fecha)
+                const año = new Date(fechaFiltro).getFullYear()
+                const mes = e.target.value.padStart(2, '0')
+                setFechaFiltro(`${año}-${mes}-01`)
               }}
-              className="px-4 py-2 rounded-lg border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
-            />
+              className="px-3 py-2 rounded-lg border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+            >
+              {mesesDisponibles.length === 0 ? (
+                <>
+                  <option value="1">Enero</option>
+                  <option value="2">Febrero</option>
+                  <option value="3">Marzo</option>
+                  <option value="4">Abril</option>
+                  <option value="5">Mayo</option>
+                  <option value="6">Junio</option>
+                  <option value="7">Julio</option>
+                  <option value="8">Agosto</option>
+                  <option value="9">Septiembre</option>
+                  <option value="10">Octubre</option>
+                  <option value="11">Noviembre</option>
+                  <option value="12">Diciembre</option>
+                </>
+              ) : (
+                mesesDisponibles.map((mes) => (
+                  <option key={mes} value={mes}>
+                    {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][mes - 1]}
+                  </option>
+                ))
+              )}
+            </select>
+            <select
+              value={new Date(fechaFiltro).getFullYear()}
+              onChange={(e) => {
+                // Al cambiar el año, seleccionar el primer mes disponible de ese año
+                const nuevoAño = parseInt(e.target.value)
+                const mesesDelAño = periodosData?.filter(p => p.anio === nuevoAño).map(p => p.mes) || []
+                const primerMes = mesesDelAño.length > 0 ? Math.max(...mesesDelAño) : new Date(fechaFiltro).getMonth() + 1
+                const mes = String(primerMes).padStart(2, '0')
+                setFechaFiltro(`${e.target.value}-${mes}-01`)
+              }}
+              className="px-3 py-2 rounded-lg border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+            >
+              {añosDisponibles.length === 0 ? (
+                <>
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                </>
+              ) : (
+                añosDisponibles.map((año) => (
+                  <option key={año} value={año}>
+                    {año}
+                  </option>
+                ))
+              )}
+            </select>
           </div>
           <div className="flex items-center gap-2 text-sm text-[#617589] dark:text-slate-400 bg-white dark:bg-[#1a2632] px-4 py-2 rounded-full border border-[#e6e8eb] dark:border-slate-700 shadow-sm">
             <span className="material-symbols-outlined text-lg">calendar_month</span>

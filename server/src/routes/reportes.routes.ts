@@ -67,11 +67,18 @@ router.post(
 // Obtener auditoría de un reporte
 router.get('/:id/auditoria', reportesController.getAuditoriaReporte)
 
-// Obtener todos los logs (solo Administrador)
+// Obtener todos los logs de reportes (solo Administrador)
 router.get(
   '/logs/todos',
   requireRole(Role.Administrador),
   reportesController.getAllLogs
+)
+
+// Obtener logs del sistema (gastos, entregas, cierres) (solo Administrador)
+router.get(
+  '/logs/sistema',
+  requireRole(Role.Administrador),
+  reportesController.getLogsSistema
 )
 
 // Obtener datos de API externa para una estación y fecha específica

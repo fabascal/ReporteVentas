@@ -276,6 +276,7 @@ export const reportesService = {
     valorNuevo?: string
     descripcion?: string
     fechaCambio: string
+    fechaReporte?: string
     estacionId?: string
     estacionNombre?: string
   }>> {
@@ -288,6 +289,32 @@ export const reportesService = {
       if (filters.busqueda) params.busqueda = filters.busqueda
     }
     const response = await api.get<PaginatedResponse<any>>('/reportes/logs/todos', { params })
+    return response.data
+  },
+
+  // Obtener logs del sistema (gastos, entregas, cierres)
+  async getLogsSistema(
+    page: number = 1,
+    limit: number = 20,
+    filtros?: {
+      entidadTipo?: string
+      usuarioId?: string
+      accion?: string
+      fechaDesde?: string
+      fechaHasta?: string
+      busqueda?: string
+    }
+  ): Promise<PaginatedResponse<any>> {
+    const params: any = { page, limit }
+    if (filtros) {
+      if (filtros.entidadTipo) params.entidadTipo = filtros.entidadTipo
+      if (filtros.usuarioId) params.usuarioId = filtros.usuarioId
+      if (filtros.accion) params.accion = filtros.accion
+      if (filtros.fechaDesde) params.fechaDesde = filtros.fechaDesde
+      if (filtros.fechaHasta) params.fechaHasta = filtros.fechaHasta
+      if (filtros.busqueda) params.busqueda = filtros.busqueda
+    }
+    const response = await api.get<PaginatedResponse<any>>('/reportes/logs/sistema', { params })
     return response.data
   },
 
