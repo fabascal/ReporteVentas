@@ -295,9 +295,9 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
               Mes:
             </label>
             <select
-              value={new Date(fechaFiltro).getMonth() + 1}
+              value={new Date(fechaFiltro + 'T12:00:00').getMonth() + 1}
               onChange={(e) => {
-                const año = new Date(fechaFiltro).getFullYear()
+                const año = new Date(fechaFiltro + 'T12:00:00').getFullYear()
                 const mes = e.target.value.padStart(2, '0')
                 setFechaFiltro(`${año}-${mes}-01`)
               }}
@@ -327,12 +327,12 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
               )}
             </select>
             <select
-              value={new Date(fechaFiltro).getFullYear()}
+              value={new Date(fechaFiltro + 'T12:00:00').getFullYear()}
               onChange={(e) => {
                 // Al cambiar el año, seleccionar el primer mes disponible de ese año
                 const nuevoAño = parseInt(e.target.value)
                 const mesesDelAño = periodosData?.filter(p => p.anio === nuevoAño).map(p => p.mes) || []
-                const primerMes = mesesDelAño.length > 0 ? Math.max(...mesesDelAño) : new Date(fechaFiltro).getMonth() + 1
+                const primerMes = mesesDelAño.length > 0 ? Math.min(...mesesDelAño) : 1
                 const mes = String(primerMes).padStart(2, '0')
                 setFechaFiltro(`${e.target.value}-${mes}-01`)
               }}
