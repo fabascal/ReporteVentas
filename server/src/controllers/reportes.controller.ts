@@ -204,6 +204,9 @@ async function guardarProductosReporte(
       // Limitar a rango válido para numeric(8,4): -9999.9999 a 9999.9999
       mermaPorcentaje = Math.max(-9999.9999, Math.min(9999.9999, porcentaje))
     }
+    
+    // Merma $ = Merma Vol * Precio
+    const mermaImporte = mermaVolumen * precio
 
     const valores = [
       reporteId,
@@ -212,7 +215,7 @@ async function guardarProductosReporte(
       litros,
       parseFloat((datos.importe || 0).toString()) || 0,
       mermaVolumen,
-      parseFloat((datos.mermaImporte || 0).toString()) || 0,
+      mermaImporte,
       mermaPorcentaje,
       parseFloat((datos.iib || 0).toString()) || 0,
       parseFloat((datos.compras || 0).toString()) || 0,
