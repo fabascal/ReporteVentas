@@ -38,17 +38,26 @@ export const getDashboardFinanciero = async (req: AuthRequest, res: Response) =>
 
     console.log('[getDashboardFinanciero] Período:', { mes, anio });
 
-    // Obtener el período
-    const periodoResult = await pool.query(
-      'SELECT * FROM periodos_mensuales WHERE anio = $1 AND mes = $2',
-      [anio, mes]
+    // Verificar que el ejercicio fiscal existe
+    const ejercicioResult = await pool.query(
+      'SELECT id FROM ejercicios_fiscales WHERE anio = $1 AND estado = $2',
+      [anio, 'activo']
     );
 
-    if (periodoResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' });
+    if (ejercicioResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Ejercicio fiscal no encontrado o inactivo' });
     }
 
-    const periodo = periodoResult.rows[0];
+    // Crear objeto periodo con fechas calculadas
+    const fecha_inicio = new Date(anio, mes - 1, 1);
+    const fecha_fin = new Date(anio, mes, 0);
+    
+    const periodo = {
+      anio,
+      mes,
+      fecha_inicio,
+      fecha_fin
+    };
 
     // Según el rol, devolver diferentes vistas
     switch (usuario.role) {
@@ -516,21 +525,24 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Obtener período mensual
+    // Calcular período mensual
     const fechaObj = new Date(fecha);
     const mes = fechaObj.getMonth() + 1;
     const anio = fechaObj.getFullYear();
 
-    const periodoResult = await pool.query(
-      'SELECT id, fecha_inicio, fecha_fin FROM periodos_mensuales WHERE mes = $1 AND anio = $2',
-      [mes, anio]
+    // Verificar que el ejercicio fiscal existe
+    const ejercicioResult = await pool.query(
+      'SELECT id FROM ejercicios_fiscales WHERE anio = $1 AND estado = $2',
+      [anio, 'activo']
     );
 
-    if (periodoResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Período mensual no encontrado' });
+    if (ejercicioResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Ejercicio fiscal no encontrado o inactivo' });
     }
 
-    const { id: periodo_id, fecha_inicio, fecha_fin } = periodoResult.rows[0];
+    // Calcular fechas del período
+    const fecha_inicio = new Date(anio, mes - 1, 1);
+    const fecha_fin = new Date(anio, mes, 0);
 
     // Verificar si el período está cerrado (cierre operativo)
     if (tipo_gasto === 'estacion' && estacion_id) {
@@ -538,8 +550,8 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
         `SELECT zpc.esta_cerrado 
          FROM zonas_periodos_cierre zpc
          JOIN estaciones e ON e.zona_id = zpc.zona_id
-         WHERE e.id = $1 AND zpc.periodo_id = $2 AND zpc.esta_cerrado = true`,
-        [estacion_id, periodo_id]
+         WHERE e.id = $1 AND zpc.anio = $2 AND zpc.mes = $3 AND zpc.esta_cerrado = true`,
+        [estacion_id, anio, mes]
       );
 
       if (cierreOperativoResult.rows.length > 0) {
@@ -721,15 +733,14 @@ export const obtenerGastos = async (req: AuthRequest, res: Response) => {
     const params: any[] = [entidad_id];
 
     if (mes && anio) {
-      const periodo = await pool.query(
-        'SELECT fecha_inicio, fecha_fin FROM periodos_mensuales WHERE anio = $1 AND mes = $2',
-        [parseInt(anio as string), parseInt(mes as string)]
-      );
+      // Calcular fechas del período directamente
+      const mesNum = parseInt(mes as string);
+      const anioNum = parseInt(anio as string);
+      const fecha_inicio = new Date(anioNum, mesNum - 1, 1);
+      const fecha_fin = new Date(anioNum, mesNum, 0);
 
-      if (periodo.rows.length > 0) {
-        query += ` AND g.fecha >= $2 AND g.fecha <= $3`;
-        params.push(periodo.rows[0].fecha_inicio, periodo.rows[0].fecha_fin);
-      }
+      query += ` AND g.fecha >= $2 AND g.fecha <= $3`;
+      params.push(fecha_inicio, fecha_fin);
     }
 
     query += ` ORDER BY g.fecha DESC`;
@@ -804,22 +815,21 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
     const mes = fechaObj.getMonth() + 1;
     const anio = fechaObj.getFullYear();
 
-    const periodoResult = await pool.query(
-      'SELECT id FROM periodos_mensuales WHERE mes = $1 AND anio = $2',
-      [mes, anio]
+    // Verificar que el ejercicio fiscal existe
+    const ejercicioResult = await pool.query(
+      'SELECT id FROM ejercicios_fiscales WHERE anio = $1 AND estado = $2',
+      [anio, 'activo']
     );
 
-    if (periodoResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Período mensual no encontrado' });
+    if (ejercicioResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Ejercicio fiscal no encontrado o inactivo' });
     }
-
-    const periodo_id = periodoResult.rows[0].id;
 
     // Verificar cierre operativo
     const cierreOperativoResult = await pool.query(
       `SELECT esta_cerrado FROM zonas_periodos_cierre 
-       WHERE zona_id = $1 AND periodo_id = $2 AND esta_cerrado = true`,
-      [zona_id, periodo_id]
+       WHERE zona_id = $1 AND anio = $2 AND mes = $3 AND esta_cerrado = true`,
+      [zona_id, anio, mes]
     );
 
     if (cierreOperativoResult.rows.length > 0) {
@@ -1025,16 +1035,15 @@ export const obtenerEntregas = async (req: AuthRequest, res: Response) => {
     }
 
     if (mes && anio) {
-      const periodo = await pool.query(
-        'SELECT fecha_inicio, fecha_fin FROM periodos_mensuales WHERE anio = $1 AND mes = $2',
-        [parseInt(anio as string), parseInt(mes as string)]
-      );
+      // Calcular fechas del período directamente
+      const mesNum = parseInt(mes as string);
+      const anioNum = parseInt(anio as string);
+      const fecha_inicio = new Date(anioNum, mesNum - 1, 1);
+      const fecha_fin = new Date(anioNum, mesNum, 0);
 
-      if (periodo.rows.length > 0) {
-        query += ` AND e.fecha >= $${paramIndex} AND e.fecha <= $${paramIndex + 1}`;
-        params.push(periodo.rows[0].fecha_inicio, periodo.rows[0].fecha_fin);
-        paramIndex += 2;
-      }
+      query += ` AND e.fecha >= $${paramIndex} AND e.fecha <= $${paramIndex + 1}`;
+      params.push(fecha_inicio, fecha_fin);
+      paramIndex += 2;
     }
 
     query += ` ORDER BY e.fecha DESC`;
@@ -1091,23 +1100,25 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
       return res.status(400).json({ error: 'El período ya está cerrado' });
     }
 
-    // Obtener período mensual
-    const periodoResult = await pool.query(
-      'SELECT id, fecha_inicio, fecha_fin FROM periodos_mensuales WHERE mes = $1 AND anio = $2',
-      [mes, anio]
+    // Verificar que el ejercicio fiscal existe
+    const ejercicioResult = await pool.query(
+      'SELECT id FROM ejercicios_fiscales WHERE anio = $1 AND estado = $2',
+      [anio, 'activo']
     );
 
-    if (periodoResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Período mensual no encontrado' });
+    if (ejercicioResult.rows.length === 0) {
+      return res.status(400).json({ error: 'Ejercicio fiscal no encontrado o inactivo' });
     }
 
-    const { id: periodo_id, fecha_inicio, fecha_fin } = periodoResult.rows[0];
+    // Calcular fechas del período
+    const fecha_inicio = new Date(anio, mes - 1, 1);
+    const fecha_fin = new Date(anio, mes, 0);
 
     // Verificar que esté cerrado operativamente
     const cierreOperativo = await pool.query(
       `SELECT esta_cerrado FROM zonas_periodos_cierre 
-       WHERE zona_id = $1 AND periodo_id = $2`,
-      [zona_id, periodo_id]
+       WHERE zona_id = $1 AND anio = $2 AND mes = $3`,
+      [zona_id, anio, mes]
     );
 
     if (cierreOperativo.rows.length === 0 || !cierreOperativo.rows[0].esta_cerrado) {
@@ -1419,17 +1430,11 @@ export const obtenerResguardoEstacion = async (req: AuthRequest, res: Response) 
       return res.status(400).json({ error: 'Se requiere estacion_id, mes y anio' });
     }
 
-    // Obtener período mensual
-    const periodoResult = await pool.query(
-      'SELECT fecha_inicio, fecha_fin FROM periodos_mensuales WHERE mes = $1 AND anio = $2',
-      [parseInt(mes as string), parseInt(anio as string)]
-    );
-
-    if (periodoResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Período mensual no encontrado' });
-    }
-
-    const { fecha_inicio, fecha_fin } = periodoResult.rows[0];
+    // Calcular fechas del período directamente
+    const mesNum = parseInt(mes as string);
+    const anioNum = parseInt(anio as string);
+    const fecha_inicio = new Date(anioNum, mesNum - 1, 1);
+    const fecha_fin = new Date(anioNum, mesNum, 0);
 
     // Calcular merma, entregas y gastos
     const result = await pool.query(`
@@ -1520,17 +1525,16 @@ export const verificarEstadoPeriodo = async (req: AuthRequest, res: Response) =>
     const mesNum = parseInt(mes as string);
     const anioNum = parseInt(anio as string);
 
-    // Obtener período
-    const periodoResult = await pool.query(
-      'SELECT id FROM periodos_mensuales WHERE mes = $1 AND anio = $2',
-      [mesNum, anioNum]
+    // Verificar que el ejercicio fiscal existe
+    const ejercicioResult = await pool.query(
+      'SELECT id FROM ejercicios_fiscales WHERE anio = $1 AND estado = $2',
+      [anioNum, 'activo']
     );
 
-    if (periodoResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' });
+    if (ejercicioResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Ejercicio fiscal no encontrado' });
     }
 
-    const periodo_id = periodoResult.rows[0].id;
     let cierre_operativo = false;
     let cierre_contable = false;
     let zona_id = null;
@@ -1554,8 +1558,8 @@ export const verificarEstadoPeriodo = async (req: AuthRequest, res: Response) =>
     const cierreOperativoResult = await pool.query(
       `SELECT esta_cerrado, fecha_cierre, observaciones
        FROM zonas_periodos_cierre
-       WHERE zona_id = $1 AND periodo_id = $2`,
-      [zona_id, periodo_id]
+       WHERE zona_id = $1 AND anio = $2 AND mes = $3`,
+      [zona_id, anioNum, mesNum]
     );
 
     if (cierreOperativoResult.rows.length > 0) {
@@ -1613,16 +1617,9 @@ export const obtenerLimiteDisponible = async (req: AuthRequest, res: Response) =
     const mesNum = mes ? parseInt(mes as string) : new Date().getMonth() + 1;
     const anioNum = anio ? parseInt(anio as string) : new Date().getFullYear();
 
-    const periodoResult = await pool.query(
-      'SELECT fecha_inicio, fecha_fin FROM periodos_mensuales WHERE mes = $1 AND anio = $2',
-      [mesNum, anioNum]
-    );
-
-    if (periodoResult.rows.length === 0) {
-      return res.status(400).json({ error: 'Período mensual no encontrado' });
-    }
-
-    const { fecha_inicio, fecha_fin } = periodoResult.rows[0];
+    // Calcular fechas del período directamente
+    const fecha_inicio = new Date(anioNum, mesNum - 1, 1);
+    const fecha_fin = new Date(anioNum, mesNum, 0);
 
     // Obtener límite y gastos acumulados
     const campo_id = entidad_tipo === 'estacion' ? 'estacion_id' : 'zona_id';
