@@ -10,7 +10,7 @@ export const ejerciciosController = {
       const result = await pool.query(`
         SELECT 
           id, anio, nombre, descripcion, estado, 
-          fecha_inicio, fecha_fin, created_at, created_by
+          fecha_inicio, fecha_fin, created_at, creado_por
         FROM ejercicios_fiscales
         ORDER BY anio DESC
       `);
