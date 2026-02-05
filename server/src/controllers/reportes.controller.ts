@@ -196,6 +196,14 @@ async function guardarProductosReporte(
       // Limitar a rango válido para numeric(8,4): -9999.9999 a 9999.9999
       eficienciaRealPorcentaje = Math.max(-9999.9999, Math.min(9999.9999, porcentaje))
     }
+    
+    // E% = (E / V) * 100, donde E = mermaVolumen
+    let mermaPorcentaje = 0
+    if (v !== 0) {
+      const porcentaje = (mermaVolumen / v) * 100
+      // Limitar a rango válido para numeric(8,4): -9999.9999 a 9999.9999
+      mermaPorcentaje = Math.max(-9999.9999, Math.min(9999.9999, porcentaje))
+    }
 
     const valores = [
       reporteId,
@@ -205,7 +213,7 @@ async function guardarProductosReporte(
       parseFloat((datos.importe || 0).toString()) || 0,
       mermaVolumen,
       parseFloat((datos.mermaImporte || 0).toString()) || 0,
-      parseFloat((datos.mermaPorcentaje || 0).toString()) || 0,
+      mermaPorcentaje,
       parseFloat((datos.iib || 0).toString()) || 0,
       parseFloat((datos.compras || 0).toString()) || 0,
       parseFloat((datos.cct || 0).toString()) || 0,
