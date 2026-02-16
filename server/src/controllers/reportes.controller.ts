@@ -116,6 +116,8 @@ async function obtenerProductosReporte(reporteId: string) {
       precio: parseFloat(row.precio || '0'),
       litros: parseFloat(row.litros || '0'),
       importe: parseFloat(row.importe || '0'),
+      adminVolumen: parseFloat(row.admin_volumen || '0'),
+      adminImporte: parseFloat(row.admin_importe || '0'),
       mermaVolumen: parseFloat(row.merma_volumen || '0'),
       mermaImporte: parseFloat(row.merma_importe || '0'),
       mermaPorcentaje: parseFloat(row.merma_porcentaje || '0'),
@@ -178,6 +180,7 @@ async function guardarProductosReporte(
     const iffb = parseFloat((datos.iffb || 0).toString()) || 0
     
     // IF = (IIB + CCT) - LTS
+    // SIEMPRE calcularlo basándose en los valores actuales
     const iif = (iib + cct) - litros
     
     // ER = IFFB - IF
@@ -214,6 +217,8 @@ async function guardarProductosReporte(
       precio,
       litros,
       parseFloat((datos.importe || 0).toString()) || 0,
+      parseFloat((datos.adminVolumen || 0).toString()) || 0,
+      parseFloat((datos.adminImporte || 0).toString()) || 0,
       mermaVolumen,
       mermaImporte,
       mermaPorcentaje,
@@ -234,14 +239,17 @@ async function guardarProductosReporte(
       `
       INSERT INTO reporte_productos (
         reporte_id, producto_id, precio, litros, importe,
+        admin_volumen, admin_importe,
         merma_volumen, merma_importe, merma_porcentaje,
         iib, compras, cct, v_dsc, dc, dif_v_dsc, if, iffb,
         eficiencia_real, eficiencia_importe, eficiencia_real_porcentaje, fecha
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, (SELECT fecha FROM reportes WHERE id = $1))
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, (SELECT fecha FROM reportes WHERE id = $1))
       ON CONFLICT (reporte_id, producto_id, fecha) DO UPDATE SET
         precio = EXCLUDED.precio,
         litros = EXCLUDED.litros,
         importe = EXCLUDED.importe,
+        admin_volumen = EXCLUDED.admin_volumen,
+        admin_importe = EXCLUDED.admin_importe,
         merma_volumen = EXCLUDED.merma_volumen,
         merma_importe = EXCLUDED.merma_importe,
         merma_porcentaje = EXCLUDED.merma_porcentaje,
@@ -453,6 +461,8 @@ export const reportesController = {
             precio: parseFloat(row.precio || '0'),
             litros_vendidos: parseFloat(row.litros || '0'), // BD usa 'litros'
             importe: parseFloat(row.importe || '0'),
+            admin_volumen: parseFloat(row.admin_volumen || '0'),
+            admin_importe: parseFloat(row.admin_importe || '0'),
             merma_volumen: parseFloat(row.merma_volumen || '0'),
             merma_importe: parseFloat(row.merma_importe || '0'),
             merma_porcentaje: parseFloat(row.merma_porcentaje || '0'),
@@ -465,7 +475,8 @@ export const reportesController = {
             v_dsc: parseFloat(row.v_dsc || '0'),
             dc: parseFloat(row.dc || '0'),
             dif_v_dsc: parseFloat(row.dif_v_dsc || '0'),
-            inventario_final: parseFloat(row.iffb || '0'), // BD usa 'iffb'
+            inventario_final: parseFloat(row.if || '0'), // BD usa 'if'
+            inventario_final_fiscalizado: parseFloat(row.iffb || '0'), // BD usa 'iffb'
           }
         })
       }
@@ -478,7 +489,9 @@ export const reportesController = {
           producto_id: null,
           precio: 0, 
           litros_vendidos: 0, 
-          importe: 0, 
+          importe: 0,
+          admin_volumen: 0,
+          admin_importe: 0,
           merma_volumen: 0, 
           merma_importe: 0, 
           merma_porcentaje: 0, 
@@ -491,7 +504,8 @@ export const reportesController = {
           v_dsc: 0, 
           dc: 0, 
           dif_v_dsc: 0, 
-          inventario_final: 0 
+          inventario_final: 0,
+          inventario_final_fiscalizado: 0 
         }
         
         // Función helper para transformar snake_case a camelCase
@@ -513,7 +527,7 @@ export const reportesController = {
           dc: prod.dc,
           difVDsc: prod.dif_v_dsc,
           if: prod.inventario_final,
-          iffb: prod.inventario_final,
+          iffb: prod.inventario_final_fiscalizado,
         })
 
         const reporte = {
@@ -1628,14 +1642,14 @@ export const reportesController = {
             const iffb = ifValue + (Math.random() * 50 - 25) // I.F.F.B. cerca de I.F.
 
             return {
-              iib: Math.round(iib * 100) / 100,
-              compras: Math.round(compras * 100) / 100,
-              cct: Math.round(cct * 100) / 100,
-              vDsc: Math.round(vDsc * 100) / 100,
-              dc: Math.round(dc * 100) / 100,
-              difVDsc: Math.round(difVDsc * 100) / 100,
-              if: Math.round(ifValue * 100) / 100,
-              iffb: Math.round(iffb * 100) / 100,
+              iib: Math.round(iib * 10000) / 10000,
+              compras: Math.round(compras * 10000) / 10000,
+              cct: Math.round(cct * 10000) / 10000,
+              vDsc: Math.round(vDsc * 10000) / 10000,
+              dc: Math.round(dc * 10000) / 10000,
+              difVDsc: Math.round(difVDsc * 10000) / 10000,
+              if: Math.round(ifValue * 10000) / 10000,
+              iffb: Math.round(iffb * 10000) / 10000,
             }
           }
 

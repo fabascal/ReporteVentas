@@ -208,7 +208,7 @@ export default function DashboardAdmin() {
               </button>
 
               <button
-                onClick={() => navigate('/admin/usuarios')}
+                onClick={() => navigate('/admin/zonas-estaciones')}
                 className="group flex items-center gap-4 p-4 rounded-lg border border-[#e6e8eb] dark:border-slate-700 hover:border-[#1173d4] hover:bg-[#1173d4]/5 transition-all"
               >
                 <div className="bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg group-hover:bg-orange-100 dark:group-hover:bg-orange-900/50 transition-colors">
@@ -219,6 +219,21 @@ export default function DashboardAdmin() {
                 <div className="text-left">
                   <h4 className="font-semibold text-[#111418] dark:text-white">Estaciones y Zonas</h4>
                   <p className="text-sm text-[#617589] dark:text-slate-400">Gestionar ubicaciones</p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => navigate('/admin/reprocesar')}
+                className="group flex items-center gap-4 p-4 rounded-lg border border-[#e6e8eb] dark:border-slate-700 hover:border-[#1173d4] hover:bg-[#1173d4]/5 transition-all"
+              >
+                <div className="bg-cyan-50 dark:bg-cyan-900/30 p-3 rounded-lg group-hover:bg-cyan-100 dark:group-hover:bg-cyan-900/50 transition-colors">
+                  <span className="material-symbols-outlined text-cyan-600 dark:text-cyan-400 text-2xl">
+                    sync
+                  </span>
+                </div>
+                <div className="text-left">
+                  <h4 className="font-semibold text-[#111418] dark:text-white">Reprocesar Estación</h4>
+                  <p className="text-sm text-[#617589] dark:text-slate-400">Actualizar datos de API externa</p>
                 </div>
               </button>
             </div>

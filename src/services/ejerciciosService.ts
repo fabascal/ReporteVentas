@@ -85,8 +85,8 @@ const ejerciciosService = {
 
   async getPeriodos(anio: number): Promise<PeriodoMensual[]> {
     try {
-      const response = await api.get<{ success: boolean; data: PeriodoMensual[] }>(`/ejercicios/${anio}/periodos`)
-      return response.data.data || []
+      const response = await api.get<{ success: boolean; periodos: PeriodoMensual[] }>(`/ejercicios/${anio}/periodos`)
+      return response.data.periodos || []
     } catch (error) {
       console.error('Error al obtener periodos:', error)
       return []

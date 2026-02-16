@@ -30,10 +30,10 @@ export const validarCierrePeriodo = async (req: Request, res: Response) => {
     // Obtener detalles de estaciones incompletas
     const detallesResult = await pool.query(`
       WITH dias_mes AS (
-        SELECT fecha_inicio, fecha_fin, 
-               (fecha_fin - fecha_inicio + 1) as total_dias
-        FROM periodos_mensuales
-        WHERE anio = $2 AND mes = $3
+        SELECT 
+          make_date($2::integer, $3::integer, 1) as fecha_inicio,
+          (make_date($2::integer, $3::integer, 1) + INTERVAL '1 month' - INTERVAL '1 day')::DATE as fecha_fin,
+          EXTRACT(DAY FROM (make_date($2::integer, $3::integer, 1) + INTERVAL '1 month' - INTERVAL '1 day'))::INTEGER as total_dias
       )
       SELECT 
         e.id,
@@ -91,21 +91,19 @@ export const obtenerControlFinanciero = async (req: Request, res: Response) => {
     console.log('[obtenerControlFinanciero] Params:', { zonaId, zonaIdFinal, anio, mes, usuarioRole });
     console.log('[obtenerControlFinanciero] Usuario:', { id: usuario?.id, email: usuario?.email, zona_id: usuario?.zona_id });
     
-    // Obtener el período
-    const periodoResult = await pool.query(
-      'SELECT * FROM periodos_mensuales WHERE anio = $1 AND mes = $2',
-      [parseInt(anio), parseInt(mes)]
-    );
-    
-    if (periodoResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' });
-    }
-    
-    const periodo = periodoResult.rows[0];
+    // Calcular fechas del período directamente
+    const anioInt = parseInt(anio);
+    const mesInt = parseInt(mes);
     
     // Calcular saldos por estación
     // Saldo = Merma (utilidades) - Entregas - Gastos
     const saldosResult = await pool.query(`
+      WITH periodo AS (
+        SELECT 
+          make_date($2::integer, $3::integer, 1) as fecha_inicio,
+          (make_date($2::integer, $3::integer, 1) + INTERVAL '1 month' - INTERVAL '1 day')::DATE as fecha_fin,
+          EXTRACT(DAY FROM (make_date($2::integer, $3::integer, 1) + INTERVAL '1 month' - INTERVAL '1 day'))::INTEGER as total_dias
+      )
       SELECT 
         e.id as estacion_id,
         e.nombre as estacion_nombre,
@@ -116,18 +114,18 @@ export const obtenerControlFinanciero = async (req: Request, res: Response) => {
         COALESCE(SUM(rp.merma_importe), 0) as saldo,
         COUNT(DISTINCT DATE(r.fecha)) as dias_reportados,
         COUNT(DISTINCT CASE WHEN r.estado = 'Aprobado' THEN DATE(r.fecha) END) as dias_aprobados,
-        (periodo.fecha_fin - periodo.fecha_inicio + 1) as total_dias
+        periodo.total_dias
       FROM estaciones e
-      CROSS JOIN (SELECT * FROM periodos_mensuales WHERE anio = $2 AND mes = $3) periodo
+      CROSS JOIN periodo
       LEFT JOIN reportes r ON r.estacion_id = e.id 
         AND DATE(r.fecha) >= periodo.fecha_inicio 
         AND DATE(r.fecha) <= periodo.fecha_fin
         AND r.estado = 'Aprobado'
       LEFT JOIN reporte_productos rp ON rp.reporte_id = r.id
       WHERE e.zona_id = $1 AND e.activa = true
-      GROUP BY e.id, e.nombre, e.identificador_externo, periodo.fecha_inicio, periodo.fecha_fin
+      GROUP BY e.id, e.nombre, e.identificador_externo, periodo.total_dias
       ORDER BY e.nombre
-    `, [zonaIdFinal, parseInt(anio), parseInt(mes)]);
+    `, [zonaIdFinal, anioInt, mesInt]);
     
     console.log('[obtenerControlFinanciero] Estaciones encontradas:', saldosResult.rows.length);
     console.log('[obtenerControlFinanciero] Primera estación:', saldosResult.rows[0]);
@@ -165,8 +163,8 @@ export const obtenerControlFinanciero = async (req: Request, res: Response) => {
     
     res.json({
       zona_id: zonaIdFinal,
-      anio: parseInt(anio),
-      mes: parseInt(mes),
+      anio: anioInt,
+      mes: mesInt,
       resumen: {
         saldo_inicial: saldoInicial,
         entregas_recibidas: entregasRecibidas,
@@ -205,17 +203,8 @@ export const obtenerEstadoCierre = async (req: Request, res: Response) => {
   }
   
   try {
-    // Obtener el período
-    const periodoResult = await pool.query(
-      'SELECT * FROM periodos_mensuales WHERE anio = $1 AND mes = $2',
-      [parseInt(anio), parseInt(mes)]
-    );
-    
-    if (periodoResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Período no encontrado' });
-    }
-    
-    const periodo = periodoResult.rows[0];
+    const anioInt = parseInt(anio);
+    const mesInt = parseInt(mes);
     
     // Obtener el cierre si existe
     const cierreResult = await pool.query(`
@@ -226,11 +215,12 @@ export const obtenerEstadoCierre = async (req: Request, res: Response) => {
       FROM zonas_periodos_cierre zpc
       LEFT JOIN users u ON zpc.cerrado_por = u.id
       LEFT JOIN users ur ON zpc.reabierto_por = ur.id
-      WHERE zpc.zona_id = $1 AND zpc.periodo_id = $2
-    `, [zonaIdFinal, periodo.id]);
+      WHERE zpc.zona_id = $1 AND zpc.anio = $2 AND zpc.mes = $3
+    `, [zonaIdFinal, anioInt, mesInt]);
     
     res.json({
-      periodo,
+      anio: anioInt,
+      mes: mesInt,
       cierre: cierreResult.rows[0] || null,
       esta_cerrado: cierreResult.rows[0]?.esta_cerrado || false
     });
@@ -267,10 +257,13 @@ export const cerrarPeriodo = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
     
+    const anioInt = parseInt(anio);
+    const mesInt = parseInt(mes);
+    
     // 1. Validar que se puede cerrar
     const validacion = await client.query(
       'SELECT * FROM validar_cierre_periodo($1, $2, $3)',
-      [zonaIdFinal, parseInt(anio), parseInt(mes)]
+      [zonaIdFinal, anioInt, mesInt]
     );
     
     if (!validacion.rows[0]?.puede_cerrar) {
@@ -281,29 +274,25 @@ export const cerrarPeriodo = async (req: Request, res: Response) => {
       });
     }
     
-    // 2. Obtener el período
-    const periodoResult = await client.query(
-      'SELECT * FROM periodos_mensuales WHERE anio = $1 AND mes = $2',
-      [parseInt(anio), parseInt(mes)]
-    );
-    
-    if (periodoResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Período no encontrado' });
-    }
-    
-    const periodo = periodoResult.rows[0];
-    
-    // 3. Verificar si ya está cerrado
+    // 2. Verificar si ya está cerrado
     const cierreExistente = await client.query(
-      'SELECT * FROM zonas_periodos_cierre WHERE zona_id = $1 AND periodo_id = $2',
-      [zonaIdFinal, periodo.id]
+      'SELECT * FROM zonas_periodos_cierre WHERE zona_id = $1 AND anio = $2 AND mes = $3',
+      [zonaIdFinal, anioInt, mesInt]
     );
     
     if (cierreExistente.rows.length > 0 && cierreExistente.rows[0].esta_cerrado) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'El período ya está cerrado' });
     }
+    
+    // Calcular fecha del período
+    const fechaInicio = `${anioInt}-${String(mesInt).padStart(2, '0')}-01`;
+    
+    // 3. Limpiar datos agregados anteriores (si existen)
+    await client.query(`
+      DELETE FROM reportes_mensuales
+      WHERE zona_id = $1 AND anio = $2 AND mes = $3
+    `, [zonaIdFinal, anioInt, mesInt]);
     
     // 4. Obtener estaciones de la zona
     const estacionesResult = await client.query(
@@ -315,16 +304,16 @@ export const cerrarPeriodo = async (req: Request, res: Response) => {
     for (const estacion of estacionesResult.rows) {
       const agregados = await client.query(
         'SELECT * FROM calcular_agregados_mensuales($1, $2, $3)',
-        [estacion.id, parseInt(anio), parseInt(mes)]
+        [estacion.id, anioInt, mesInt]
       );
       
       if (agregados.rows.length > 0) {
         const agg = agregados.rows[0];
         
-        // Insertar en reportes_mensuales
+        // Insertar en reportes_mensuales (sin periodo_id)
         await client.query(`
           INSERT INTO reportes_mensuales (
-            zona_id, periodo_id, estacion_id, anio, mes, fecha,
+            zona_id, estacion_id, anio, mes, fecha,
             premium_volumen_total, premium_importe_total, premium_precio_promedio,
             premium_merma_volumen_total, premium_merma_importe_total, premium_merma_porcentaje_promedio,
             premium_eficiencia_real_total, premium_eficiencia_importe_total, premium_eficiencia_real_porcentaje_promedio,
@@ -336,14 +325,14 @@ export const cerrarPeriodo = async (req: Request, res: Response) => {
             diesel_eficiencia_real_total, diesel_eficiencia_importe_total, diesel_eficiencia_real_porcentaje_promedio,
             aceites_total, total_ventas, dias_reportados
           ) VALUES (
-            $1, $2, $3, $4, $5, $6,
-            $7, $8, $9, $10, $11, $12, $13, $14, $15,
-            $16, $17, $18, $19, $20, $21, $22, $23, $24,
-            $25, $26, $27, $28, $29, $30, $31, $32, $33,
-            $34, $35, $36
+            $1, $2, $3, $4, $5,
+            $6, $7, $8, $9, $10, $11, $12, $13, $14,
+            $15, $16, $17, $18, $19, $20, $21, $22, $23,
+            $24, $25, $26, $27, $28, $29, $30, $31, $32,
+            $33, $34, $35
           )
         `, [
-          zonaIdFinal, periodo.id, estacion.id, parseInt(anio), parseInt(mes), periodo.fecha_inicio,
+          zonaIdFinal, estacion.id, anioInt, mesInt, fechaInicio,
           agg.premium_vol, agg.premium_imp, agg.premium_precio,
           agg.premium_merma_vol, agg.premium_merma_imp, agg.premium_merma_pct,
           agg.premium_efic_real, agg.premium_efic_imp, agg.premium_efic_pct,
@@ -361,18 +350,18 @@ export const cerrarPeriodo = async (req: Request, res: Response) => {
     // 6. Registrar el cierre
     const cierreResult = await client.query(`
       INSERT INTO zonas_periodos_cierre (
-        zona_id, periodo_id, cerrado_por, observaciones, esta_cerrado
-      ) VALUES ($1, $2, $3, $4, true)
-      ON CONFLICT (zona_id, periodo_id) 
+        zona_id, anio, mes, cerrado_por, observaciones, esta_cerrado
+      ) VALUES ($1, $2, $3, $4, $5, true)
+      ON CONFLICT (zona_id, anio, mes) 
       DO UPDATE SET 
         fecha_cierre = CURRENT_TIMESTAMP,
-        cerrado_por = $3,
-        observaciones = $4,
+        cerrado_por = $4,
+        observaciones = $5,
         esta_cerrado = true,
         reabierto_en = NULL,
         reabierto_por = NULL
       RETURNING *
-    `, [zonaIdFinal, periodo.id, usuarioId, observaciones || null]);
+    `, [zonaIdFinal, anioInt, mesInt, usuarioId, observaciones || null]);
     
     await client.query('COMMIT');
 
@@ -383,21 +372,23 @@ export const cerrarPeriodo = async (req: Request, res: Response) => {
     // Registrar en auditoría
     await registrarAuditoriaGeneral({
       entidadTipo: 'CIERRE_PERIODO',
-      entidadId: cierreResult.rows[0].id,
+      entidadId: zonaIdFinal, // Usar zona_id (UUID) en lugar de cierre.id (INTEGER)
       usuarioId: usuarioId,
       usuarioNombre: usuario?.name || usuario?.email || 'Usuario',
       accion: 'CERRAR',
-      descripcion: `Cierre de período ${mes}/${anio} para zona "${nombreZona}". ${estacionesResult.rows.length} estación(es) procesada(s)`,
+      descripcion: `Cierre de período ${mesInt}/${anioInt} para zona "${nombreZona}". ${estacionesResult.rows.length} estación(es) procesada(s)`,
       datosNuevos: {
         zona: nombreZona,
-        periodo: `${mes}/${anio}`,
+        periodo: `${mesInt}/${anioInt}`,
         estaciones_procesadas: estacionesResult.rows.length,
-        observaciones: observaciones || null
+        observaciones: observaciones || null,
+        cierre_id: cierreResult.rows[0].id
       },
       metadata: {
-        mes,
-        anio,
-        zona_id: zonaIdFinal
+        mes: mesInt,
+        anio: anioInt,
+        zona_id: zonaIdFinal,
+        cierre_id: cierreResult.rows[0].id
       }
     });
     
@@ -438,28 +429,18 @@ export const reabrirPeriodo = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
     
-    // Obtener el período
-    const periodoResult = await client.query(
-      'SELECT * FROM periodos_mensuales WHERE anio = $1 AND mes = $2',
-      [parseInt(anio), parseInt(mes)]
-    );
-    
-    if (periodoResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Período no encontrado' });
-    }
-    
-    const periodo = periodoResult.rows[0];
+    const anioInt = parseInt(anio);
+    const mesInt = parseInt(mes);
     
     // Actualizar el cierre
     const result = await client.query(`
       UPDATE zonas_periodos_cierre
       SET esta_cerrado = false,
           reabierto_en = CURRENT_TIMESTAMP,
-          reabierto_por = $3
-      WHERE zona_id = $1 AND periodo_id = $2
+          reabierto_por = $4
+      WHERE zona_id = $1 AND anio = $2 AND mes = $3
       RETURNING *
-    `, [zonaId, periodo.id, usuarioId]);
+    `, [zonaId, anioInt, mesInt, usuarioId]);
     
     if (result.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -469,8 +450,8 @@ export const reabrirPeriodo = async (req: Request, res: Response) => {
     // Eliminar los agregados mensuales (para recalcular cuando se cierre de nuevo)
     await client.query(`
       DELETE FROM reportes_mensuales
-      WHERE zona_id = $1 AND periodo_id = $2
-    `, [zonaId, periodo.id]);
+      WHERE zona_id = $1 AND anio = $2 AND mes = $3
+    `, [zonaId, anioInt, mesInt]);
     
     await client.query('COMMIT');
 
@@ -481,19 +462,21 @@ export const reabrirPeriodo = async (req: Request, res: Response) => {
     // Registrar en auditoría
     await registrarAuditoriaGeneral({
       entidadTipo: 'REAPERTURA_PERIODO',
-      entidadId: result.rows[0].id,
+      entidadId: zonaId, // Usar zona_id (UUID) en lugar de cierre.id (INTEGER)
       usuarioId: usuarioId,
       usuarioNombre: usuario?.name || usuario?.email || 'Usuario',
       accion: 'REABRIR',
-      descripcion: `Reapertura de período ${mes}/${anio} para zona "${nombreZona}"`,
+      descripcion: `Reapertura de período ${mesInt}/${anioInt} para zona "${nombreZona}"`,
       datosNuevos: {
         zona: nombreZona,
-        periodo: `${mes}/${anio}`
+        periodo: `${mesInt}/${anioInt}`,
+        cierre_id: result.rows[0].id
       },
       metadata: {
-        mes,
-        anio,
-        zona_id: zonaId
+        mes: mesInt,
+        anio: anioInt,
+        zona_id: zonaId,
+        cierre_id: result.rows[0].id
       }
     });
     
@@ -539,12 +522,33 @@ export const obtenerResumenMensual = async (req: Request, res: Response) => {
 };
 
 /**
- * Listar períodos disponibles
+ * Listar períodos disponibles (últimos 24 meses desde ejercicios fiscales activos)
  */
 export const listarPeriodos = async (req: Request, res: Response) => {
   try {
     const result = await pool.query(`
-      SELECT * FROM periodos_mensuales
+      SELECT 
+        anio, 
+        mes,
+        CASE mes
+          WHEN 1 THEN 'Enero'
+          WHEN 2 THEN 'Febrero'
+          WHEN 3 THEN 'Marzo'
+          WHEN 4 THEN 'Abril'
+          WHEN 5 THEN 'Mayo'
+          WHEN 6 THEN 'Junio'
+          WHEN 7 THEN 'Julio'
+          WHEN 8 THEN 'Agosto'
+          WHEN 9 THEN 'Septiembre'
+          WHEN 10 THEN 'Octubre'
+          WHEN 11 THEN 'Noviembre'
+          WHEN 12 THEN 'Diciembre'
+        END || ' ' || anio as nombre,
+        make_date(anio, mes, 1) as fecha_inicio,
+        (make_date(anio, mes, 1) + INTERVAL '1 month' - INTERVAL '1 day')::DATE as fecha_fin
+      FROM ejercicios_fiscales,
+      LATERAL generate_series(1, 12) AS mes
+      WHERE estado = 'activo'
       ORDER BY anio DESC, mes DESC
       LIMIT 24
     `);
@@ -566,17 +570,27 @@ export const listarCierresZona = async (req: Request, res: Response) => {
     const result = await pool.query(`
       SELECT 
         zpc.*,
-        pm.nombre as periodo_nombre,
-        pm.anio,
-        pm.mes,
+        CASE zpc.mes
+          WHEN 1 THEN 'Enero'
+          WHEN 2 THEN 'Febrero'
+          WHEN 3 THEN 'Marzo'
+          WHEN 4 THEN 'Abril'
+          WHEN 5 THEN 'Mayo'
+          WHEN 6 THEN 'Junio'
+          WHEN 7 THEN 'Julio'
+          WHEN 8 THEN 'Agosto'
+          WHEN 9 THEN 'Septiembre'
+          WHEN 10 THEN 'Octubre'
+          WHEN 11 THEN 'Noviembre'
+          WHEN 12 THEN 'Diciembre'
+        END || ' ' || zpc.anio as periodo_nombre,
         u.name as cerrado_por_nombre,
         ur.name as reabierto_por_nombre
       FROM zonas_periodos_cierre zpc
-      INNER JOIN periodos_mensuales pm ON zpc.periodo_id = pm.id
       LEFT JOIN users u ON zpc.cerrado_por = u.id
       LEFT JOIN users ur ON zpc.reabierto_por = ur.id
       WHERE zpc.zona_id = $1
-      ORDER BY pm.anio DESC, pm.mes DESC
+      ORDER BY zpc.anio DESC, zpc.mes DESC
     `, [zonaId]);
     
     res.json(result.rows);

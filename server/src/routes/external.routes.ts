@@ -16,5 +16,6 @@ router.post('/refresh', externalController.refreshToken)
 // Endpoints protegidos (requieren token válido)
 router.get('/reportes-mensuales', authenticateExternalToken, externalController.getReportesMensuales)
 router.get('/eficiencia-estaciones', authenticateExternalToken, externalController.getEficienciaEstaciones)
+router.get('/conciliacion-mensual', authenticateExternalToken, externalController.getConciliacionMensual)
 
 export default router

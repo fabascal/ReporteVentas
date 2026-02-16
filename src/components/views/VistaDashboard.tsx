@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { ReporteVentas } from '../../types/reportes'
 import { useEjerciciosActivos } from '../../hooks/useEjerciciosActivos'
 import {
@@ -53,6 +53,9 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
   onOpenCierre,
 }) => {
   const { aniosDisponibles } = useEjerciciosActivos()
+  
+  // Estado para producto seleccionado en gráfica de merma
+  const [productoMermaSeleccionado, setProductoMermaSeleccionado] = useState<'Premium' | 'Magna' | 'Diesel'>('Premium')
   
   // Usar mediodía para evitar problemas de zona horaria
   const fechaSeleccionada = new Date(fechaFiltro + 'T12:00:00')
@@ -197,14 +200,20 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
               <span className="material-symbols-outlined text-3xl">local_gas_station</span>
             </div>
           </div>
-          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Premium</p>
-          <p className="text-2xl font-black text-red-600 dark:text-red-400 tracking-tight">
-            ${totalesAcumulados.premium.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Merma Premium</p>
+          <p className="text-xl font-black text-red-600 dark:text-red-400 tracking-tight">
+            {totalesAcumulados.premium.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+          </p>
+          <p className="text-xl font-black text-red-600 dark:text-red-400 tracking-tight mt-1">
+            ${totalesAcumulados.premium.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
           </p>
           <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800">
             <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
             <p className="text-xs font-semibold text-red-600 dark:text-red-400">
-              Día {diaSeleccionado}: ${totalesDia.premium.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Día {diaSeleccionado}: {totalesDia.premium.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+            </p>
+            <p className="text-xs font-semibold text-red-600 dark:text-red-400">
+              ${totalesDia.premium.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
         </div>
@@ -216,14 +225,20 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
               <span className="material-symbols-outlined text-3xl">local_gas_station</span>
             </div>
           </div>
-          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Magna</p>
-          <p className="text-2xl font-black text-green-600 dark:text-green-400 tracking-tight">
-            ${totalesAcumulados.magna.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Merma Magna</p>
+          <p className="text-xl font-black text-green-600 dark:text-green-400 tracking-tight">
+            {totalesAcumulados.magna.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+          </p>
+          <p className="text-xl font-black text-green-600 dark:text-green-400 tracking-tight mt-1">
+            ${totalesAcumulados.magna.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
           </p>
           <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
             <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
             <p className="text-xs font-semibold text-green-600 dark:text-green-400">
-              Día {diaSeleccionado}: ${totalesDia.magna.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Día {diaSeleccionado}: {totalesDia.magna.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+            </p>
+            <p className="text-xs font-semibold text-green-600 dark:text-green-400">
+              ${totalesDia.magna.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
         </div>
@@ -235,14 +250,20 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
               <span className="material-symbols-outlined text-3xl">local_gas_station</span>
             </div>
           </div>
-          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Diesel</p>
-          <p className="text-2xl font-black text-gray-700 dark:text-gray-300 tracking-tight">
-            ${totalesAcumulados.diesel.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Merma Diesel</p>
+          <p className="text-xl font-black text-gray-700 dark:text-gray-300 tracking-tight">
+            {totalesAcumulados.diesel.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+          </p>
+          <p className="text-xl font-black text-gray-700 dark:text-gray-300 tracking-tight mt-1">
+            ${totalesAcumulados.diesel.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
           </p>
           <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-800">
             <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-              Día {diaSeleccionado}: ${totalesDia.diesel.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Día {diaSeleccionado}: {totalesDia.diesel.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+            </p>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              ${totalesDia.diesel.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
         </div>
@@ -250,17 +271,23 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
         <div className="rounded-xl border-2 border-[#1173d4] dark:border-[#1173d4] bg-[#1173d4]/5 dark:bg-[#1173d4]/10 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="rounded-lg bg-[#1173d4]/20 dark:bg-[#1173d4]/30 p-3 text-[#1173d4]">
-              <span className="material-symbols-outlined text-3xl">payments</span>
+              <span className="material-symbols-outlined text-3xl">water_drop</span>
             </div>
           </div>
-          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Total General</p>
-          <p className="text-2xl font-black text-[#1173d4] tracking-tight">
-            ${totalGeneralAcumulado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Merma Total</p>
+          <p className="text-xl font-black text-[#1173d4] tracking-tight">
+            {totalGeneralAcumulado.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+          </p>
+          <p className="text-xl font-black text-[#1173d4] tracking-tight mt-1">
+            ${totalGeneralAcumulado.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
           </p>
           <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
             <p className="text-xs text-[#617589] dark:text-slate-400">Acumulado (1-{diaSeleccionado})</p>
             <p className="text-xs font-semibold text-[#1173d4]">
-              Día {diaSeleccionado}: ${totalGeneralDia.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Día {diaSeleccionado}: {totalGeneralDia.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
+            </p>
+            <p className="text-xs font-semibold text-[#1173d4]">
+              ${totalGeneralDia.pesos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
         </div>
@@ -287,10 +314,10 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
                     borderRadius: '8px',
                   }}
                 />
-                <Legend />
-                <Line type="monotone" dataKey="Premium" stroke="#ef4444" strokeWidth={2} />
-                <Line type="monotone" dataKey="Magna" stroke="#22c55e" strokeWidth={2} />
-                <Line type="monotone" dataKey="Diesel" stroke="#6b7280" strokeWidth={2} />
+                <Line type="monotone" dataKey="Diesel" stroke="#6b7280" strokeWidth={2} name="Diesel" />
+                <Line type="monotone" dataKey="Magna" stroke="#22c55e" strokeWidth={2} name="Magna" />
+                <Line type="monotone" dataKey="Premium" stroke="#ef4444" strokeWidth={2} name="Premium" />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -321,12 +348,12 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
                     border: '1px solid #e6e8eb',
                     borderRadius: '8px',
                   }}
-                  formatter={(value: number | undefined) => value ? `${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })} L` : '0 L'}
+                  formatter={(value: number | undefined) => value ? `${value.toLocaleString('es-MX', { minimumFractionDigits: 4 })} L` : '0 L'}
                 />
-                <Legend />
-                <Bar dataKey="Premium" fill="#ef4444" />
-                <Bar dataKey="Magna" fill="#22c55e" />
-                <Bar dataKey="Diesel" fill="#6b7280" />
+                <Bar dataKey="Diesel" fill="#6b7280" name="Diesel" />
+                <Bar dataKey="Magna" fill="#22c55e" name="Magna" />
+                <Bar dataKey="Premium" fill="#ef4444" name="Premium" />
+                <Legend wrapperStyle={{ paddingTop: '10px' }} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -342,25 +369,81 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
 
       {/* Merma por Estación */}
       <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm mb-8">
-        <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-4 flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#ef4444]">warning</span>
-          Merma por Estación (%) - {nombreMes}
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-[#111418] dark:text-white flex items-center gap-2">
+            <span className="material-symbols-outlined text-[#ef4444]">warning</span>
+            Merma por Estación (%) - {nombreMes}
+          </h3>
+          
+          {/* Selector de Producto */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setProductoMermaSeleccionado('Premium')}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                productoMermaSeleccionado === 'Premium'
+                  ? 'bg-red-500 text-white shadow-md'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              Premium
+            </button>
+            <button
+              onClick={() => setProductoMermaSeleccionado('Magna')}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                productoMermaSeleccionado === 'Magna'
+                  ? 'bg-green-500 text-white shadow-md'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              Magna
+            </button>
+            <button
+              onClick={() => setProductoMermaSeleccionado('Diesel')}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                productoMermaSeleccionado === 'Diesel'
+                  ? 'bg-gray-600 text-white shadow-md'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              Diesel
+            </button>
+          </div>
+        </div>
+        
         {datosMermaPorEstacion.length > 0 ? (
           <>
-            <ResponsiveContainer width="100%" height={Math.max(400, datosMermaPorEstacion.length * 35)}>
+            <ResponsiveContainer width="100%" height={Math.max(400, datosMermaPorEstacion.length * 25)}>
               <BarChart 
                 data={datosMermaPorEstacion} 
                 layout="vertical"
-                margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                margin={{ top: 35, right: 30, left: 100, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e6e8eb" className="dark:stroke-slate-700" />
+                
+                {/* Eje X inferior - principal */}
                 <XAxis 
                   type="number" 
-                  stroke="#617589" 
-                  className="dark:stroke-slate-400"
+                  stroke="#617589"
                   tickFormatter={(value) => `${value}%`}
+                  tick={{ fill: '#617589', fontSize: 12 }}
+                  tickLine={{ stroke: '#617589' }}
+                  axisLine={{ stroke: '#617589' }}
+                  orientation="bottom"
                 />
+                
+                {/* Eje X superior - duplicado */}
+                <XAxis 
+                  type="number" 
+                  stroke="#617589"
+                  tickFormatter={(value) => `${value}%`}
+                  tick={{ fill: '#617589', fontSize: 12 }}
+                  tickLine={{ stroke: '#617589' }}
+                  axisLine={{ stroke: '#617589' }}
+                  orientation="top"
+                  xAxisId="top"
+                  allowDataOverflow={false}
+                />
+                
                 <YAxis 
                   type="category" 
                   dataKey="estacion" 
@@ -377,9 +460,12 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
                   formatter={(value: number | undefined) => value ? `${value.toFixed(2)}%` : '0.00%'}
                 />
                 <Legend />
-                <Bar dataKey="Premium" fill="#ef4444" name="Premium" />
-                <Bar dataKey="Magna" fill="#22c55e" name="Magna" />
-                <Bar dataKey="Diesel" fill="#6b7280" name="Diesel" />
+                <Bar 
+                  dataKey={productoMermaSeleccionado} 
+                  fill={productoMermaSeleccionado === 'Premium' ? '#ef4444' : productoMermaSeleccionado === 'Magna' ? '#22c55e' : '#6b7280'} 
+                  name={productoMermaSeleccionado}
+                  xAxisId="top"
+                />
               </BarChart>
             </ResponsiveContainer>
 
@@ -472,7 +558,7 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
                   border: '1px solid #e6e8eb',
                   borderRadius: '8px',
                 }}
-                formatter={(value: number | undefined) => value ? `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+                formatter={(value: number | undefined) => value ? `$${value.toLocaleString('es-MX', { minimumFractionDigits: 4 })}` : '$0.00'}
                 labelFormatter={(label) => `Estación: ${label}`}
               />
               <Bar dataKey="Total Ventas" fill="#1173d4" />
@@ -507,9 +593,9 @@ const VistaDashboard: React.FC<VistaDashboardProps> = ({
             </p>
           </div>
           <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
-            <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Promedio por Reporte</p>
+            <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Promedio/Reporte</p>
             <p className="text-2xl font-black text-[#111418] dark:text-white">
-              ${reportesAcumulados.length > 0 ? (totalGeneralAcumulado / reportesAcumulados.length).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+              {reportesAcumulados.length > 0 ? (totalGeneralAcumulado / reportesAcumulados.length).toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }) : '0.00'}
             </p>
           </div>
         </div>

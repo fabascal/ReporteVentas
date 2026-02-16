@@ -79,7 +79,7 @@ export default function ReporteVtas() {
 
   const formatNumber = (value: number | undefined): string => {
     if (value === undefined || value === null) return '0.00'
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value)
   }
 
   // Calcular totales

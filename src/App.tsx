@@ -20,6 +20,7 @@ import AdminProductos from './pages/AdminProductos'
 import AdminHistorial from './pages/AdminHistorial'
 import AdminLogs from './pages/AdminLogs'
 import AdminDetalleZona from './pages/AdminDetalleZona'
+import AdminReprocesar from './pages/AdminReprocesar'
 import GestionPeriodos from './pages/GestionPeriodos'
 import ImportarReportes from './pages/ImportarReportes'
 import { Role } from './types/auth'
@@ -133,6 +134,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[Role.Administrador]}>
               <AdminLogs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reprocesar"
+          element={
+            <ProtectedRoute allowedRoles={[Role.Administrador]}>
+              <AdminReprocesar />
             </ProtectedRoute>
           }
         />

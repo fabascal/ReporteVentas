@@ -218,6 +218,8 @@ export class ApiExternaService {
           precio: reporte.premium.precio,
           litros: reporte.premium.litros,
           importe: reporte.premium.importe,
+          adminVolumen: reporte.premium.adminVolumen,
+          adminImporte: reporte.premium.adminImporte,
           mermaVolumen: reporte.premium.mermaVolumen,
           mermaImporte: reporte.premium.mermaImporte,
           mermaPorcentaje: reporte.premium.mermaPorcentaje,
@@ -226,6 +228,8 @@ export class ApiExternaService {
           precio: reporte.magna.precio,
           litros: reporte.magna.litros,
           importe: reporte.magna.importe,
+          adminVolumen: reporte.magna.adminVolumen,
+          adminImporte: reporte.magna.adminImporte,
           mermaVolumen: reporte.magna.mermaVolumen,
           mermaImporte: reporte.magna.mermaImporte,
           mermaPorcentaje: reporte.magna.mermaPorcentaje,
@@ -234,6 +238,8 @@ export class ApiExternaService {
           precio: reporte.diesel.precio,
           litros: reporte.diesel.litros,
           importe: reporte.diesel.importe,
+          adminVolumen: reporte.diesel.adminVolumen,
+          adminImporte: reporte.diesel.adminImporte,
           mermaVolumen: reporte.diesel.mermaVolumen,
           mermaImporte: reporte.diesel.mermaImporte,
           mermaPorcentaje: reporte.diesel.mermaPorcentaje,
@@ -432,9 +438,9 @@ export class ApiExternaService {
           identificadorExterno: identificador,
           nombreEstacion: this.extraerNombreEstacion(item.Estación),
           fecha: null, // Se debe proporcionar desde fuera
-          premium: { precio: 0, litros: 0, importe: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
-          magna: { precio: 0, litros: 0, importe: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
-          diesel: { precio: 0, litros: 0, importe: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
+          premium: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
+          magna: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
+          diesel: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
         })
       }
 
@@ -453,6 +459,8 @@ export class ApiExternaService {
       // Mapear productos y sumar si hay múltiples registros del mismo producto
       const volumen = parseFloat(item.Volumen) || 0
       const importe = parseFloat(item.Importe) || 0
+      const volumenAdmin = parseFloat(item['Volumen Admin'] || '0') || 0
+      const importeAdmin = parseFloat(item['Importe Admin'] || '0') || 0
       const volumenMerma = parseFloat(item['Volumen Merma'] || '0') || 0
       const importeMerma = parseFloat(item['Importe Merma'] || '0') || 0
       // El porcentaje viene como decimal (ej: 0.025478 = 2.5478%), lo convertimos a porcentaje
@@ -469,6 +477,8 @@ export class ApiExternaService {
           reporte.premium.precio = totalLitros > 0 ? totalImporte / totalLitros : 0
           reporte.premium.litros = totalLitros
           reporte.premium.importe = totalImporte
+          reporte.premium.adminVolumen = reporte.premium.adminVolumen + volumenAdmin
+          reporte.premium.adminImporte = reporte.premium.adminImporte + importeAdmin
           reporte.premium.mermaVolumen = reporte.premium.mermaVolumen + volumenMerma
           reporte.premium.mermaImporte = reporte.premium.mermaImporte + importeMerma
           // Calcular promedio ponderado del porcentaje de merma basado en el volumen
@@ -483,6 +493,8 @@ export class ApiExternaService {
           reporte.premium.precio = precioUnitario
           reporte.premium.litros = volumen
           reporte.premium.importe = importe
+          reporte.premium.adminVolumen = volumenAdmin
+          reporte.premium.adminImporte = importeAdmin
           reporte.premium.mermaVolumen = volumenMerma
           reporte.premium.mermaImporte = importeMerma
           // Usar el porcentaje que viene de la API directamente
@@ -495,6 +507,8 @@ export class ApiExternaService {
           reporte.magna.precio = totalLitros > 0 ? totalImporte / totalLitros : 0
           reporte.magna.litros = totalLitros
           reporte.magna.importe = totalImporte
+          reporte.magna.adminVolumen = reporte.magna.adminVolumen + volumenAdmin
+          reporte.magna.adminImporte = reporte.magna.adminImporte + importeAdmin
           reporte.magna.mermaVolumen = reporte.magna.mermaVolumen + volumenMerma
           reporte.magna.mermaImporte = reporte.magna.mermaImporte + importeMerma
           // Calcular promedio ponderado del porcentaje de merma basado en el volumen
@@ -509,6 +523,8 @@ export class ApiExternaService {
           reporte.magna.precio = precioUnitario
           reporte.magna.litros = volumen
           reporte.magna.importe = importe
+          reporte.magna.adminVolumen = volumenAdmin
+          reporte.magna.adminImporte = importeAdmin
           reporte.magna.mermaVolumen = volumenMerma
           reporte.magna.mermaImporte = importeMerma
           // Usar el porcentaje que viene de la API directamente
@@ -521,6 +537,8 @@ export class ApiExternaService {
           reporte.diesel.precio = totalLitros > 0 ? totalImporte / totalLitros : 0
           reporte.diesel.litros = totalLitros
           reporte.diesel.importe = totalImporte
+          reporte.diesel.adminVolumen = reporte.diesel.adminVolumen + volumenAdmin
+          reporte.diesel.adminImporte = reporte.diesel.adminImporte + importeAdmin
           reporte.diesel.mermaVolumen = reporte.diesel.mermaVolumen + volumenMerma
           reporte.diesel.mermaImporte = reporte.diesel.mermaImporte + importeMerma
           // Calcular promedio ponderado del porcentaje de merma basado en el volumen
@@ -535,6 +553,8 @@ export class ApiExternaService {
           reporte.diesel.precio = precioUnitario
           reporte.diesel.litros = volumen
           reporte.diesel.importe = importe
+          reporte.diesel.adminVolumen = volumenAdmin
+          reporte.diesel.adminImporte = importeAdmin
           reporte.diesel.mermaVolumen = volumenMerma
           reporte.diesel.mermaImporte = importeMerma
           // Usar el porcentaje que viene de la API directamente

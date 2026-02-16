@@ -487,7 +487,7 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
           </div>
           <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Aceites ($)</p>
           <p className="text-2xl font-black text-blue-600 dark:text-blue-400 tracking-tight">
-            ${totales.aceites.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${totales.aceites.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
           </p>
         </div>
       </div>
@@ -605,7 +605,7 @@ export default function VistaDashboardGerenteEstacion({ userRole }: VistaDashboa
                   border: '1px solid #e6e8eb',
                   borderRadius: '8px',
                 }}
-                formatter={(value: number) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                formatter={(value: number) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`}
               />
               <Bar dataKey="aceites" fill="#3b82f6" />
             </BarChart>

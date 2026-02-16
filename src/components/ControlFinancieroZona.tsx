@@ -69,35 +69,35 @@ export default function ControlFinancieroZona({
           <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
             <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Saldo Inicial</p>
             <p className="text-xl font-black text-[#111418] dark:text-white">
-              ${resumen.saldo_inicial.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${resumen.saldo_inicial.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
 
           <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
             <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Entregas Recibidas</p>
             <p className="text-xl font-black text-[#111418] dark:text-white">
-              ${resumen.entregas_recibidas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${resumen.entregas_recibidas.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
 
           <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
             <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Entregas a Dirección</p>
             <p className="text-xl font-black text-[#111418] dark:text-white">
-              ${resumen.entregas_direccion.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${resumen.entregas_direccion.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
 
           <div className="rounded-lg border border-[#e6e8eb] dark:border-slate-700 p-4 bg-gray-50 dark:bg-[#101922]">
             <p className="text-xs font-semibold text-[#617589] dark:text-slate-400 mb-1">Gastos de Zona</p>
             <p className="text-xl font-black text-[#111418] dark:text-white">
-              ${resumen.gastos_zona.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${resumen.gastos_zona.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
 
           <div className="rounded-lg border-2 border-green-500 dark:border-green-600 p-4 bg-green-50 dark:bg-green-900/20">
             <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">Resguardo Actual</p>
             <p className="text-xl font-black text-green-700 dark:text-green-400">
-              ${resumen.resguardo_actual.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${resumen.resguardo_actual.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
         </div>
@@ -180,17 +180,17 @@ export default function ControlFinancieroZona({
                       </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100 font-semibold">
-                      ${est.merma.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${est.merma.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
-                      ${est.entregas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${est.entregas.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900 dark:text-gray-100">
-                      ${est.gastos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${est.gastos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-bold">
                       <span className={est.saldo > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}>
-                        ${est.saldo.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        ${est.saldo.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-center">

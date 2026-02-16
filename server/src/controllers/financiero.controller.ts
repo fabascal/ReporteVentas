@@ -877,8 +877,8 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       const saldo_disponible = parseFloat(merma_generada) - parseFloat(gastos_realizados) - parseFloat(entregas_realizadas);
 
       // Redondear ambos valores a 2 decimales para evitar errores de precisión de punto flotante
-      const montoRedondeado = Math.round(monto * 100) / 100;
-      const saldoRedondeado = Math.round(saldo_disponible * 100) / 100;
+      const montoRedondeado = Math.round(monto * 10000) / 10000;
+      const saldoRedondeado = Math.round(saldo_disponible * 10000) / 10000;
 
       if (montoRedondeado > saldoRedondeado) {
         return res.status(400).json({ 
@@ -914,8 +914,8 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       const resguardo_disponible = parseFloat(entregas_recibidas) - parseFloat(gastos_zona) - parseFloat(entregas_enviadas);
 
       // Redondear ambos valores a 2 decimales para evitar errores de precisión de punto flotante
-      const montoRedondeado = Math.round(monto * 100) / 100;
-      const resguardoRedondeado = Math.round(resguardo_disponible * 100) / 100;
+      const montoRedondeado = Math.round(monto * 10000) / 10000;
+      const resguardoRedondeado = Math.round(resguardo_disponible * 10000) / 10000;
 
       if (montoRedondeado > resguardoRedondeado) {
         return res.status(400).json({ 

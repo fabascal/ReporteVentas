@@ -74,7 +74,7 @@ export default function FormularioCapturaVentas({ onSuccess, onCancel }: Formula
     const numStr = value.toString().replace(/,/g, '')
     const num = parseFloat(numStr)
     if (isNaN(num)) return ''
-    return num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return num.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
   }
 
   // Función para convertir valor formateado de vuelta a número (sin formato)

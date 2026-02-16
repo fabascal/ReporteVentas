@@ -57,6 +57,13 @@ router.post(
   apiExternaController.sincronizarEstaciones
 )
 
+// Reprocesar estación específica día por día (solo Administrador)
+router.post(
+  '/reprocesar-estacion',
+  requireRole(Role.Administrador),
+  apiExternaController.reprocesarEstacion
+)
+
 // Actualizar reportes existentes con valores aleatorios (solo Administrador)
 router.post(
   '/actualizar-valores-aleatorios',

@@ -341,19 +341,19 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-[#617589] dark:text-slate-400">Límite mensual:</span>
                   <span className="font-semibold text-[#111418] dark:text-white">
-                    ${limiteData.limite_gastos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${limiteData.limite_gastos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm mt-1">
                   <span className="text-[#617589] dark:text-slate-400">Gastado:</span>
                   <span className="text-orange-600 dark:text-orange-400 font-medium">
-                    ${limiteData.gastos_acumulados.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${limiteData.gastos_acumulados.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm mt-1 pt-2 border-t border-blue-200 dark:border-slate-700">
                   <span className="text-[#617589] dark:text-slate-400 font-semibold">Disponible:</span>
                   <span className={`font-bold ${limiteData.disponible > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    ${limiteData.disponible.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${limiteData.disponible.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                   </span>
                 </div>
                 {limiteData.disponible <= 0 && (

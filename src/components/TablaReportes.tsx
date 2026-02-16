@@ -83,10 +83,10 @@ export default function TablaReportes({
                   {(reporte.premium.mermaVolumen > 0 || reporte.premium.mermaImporte > 0) ? (
                     <div className="text-xs">
                       <div className="text-[#617589] dark:text-slate-400">
-                        {reporte.premium.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                        {reporte.premium.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                       </div>
                       <div className="text-[#617589] dark:text-slate-400 font-semibold">
-                        {reporte.premium.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                        {reporte.premium.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                       </div>
                     </div>
                   ) : (
@@ -97,10 +97,10 @@ export default function TablaReportes({
                   {(reporte.magna.mermaVolumen > 0 || reporte.magna.mermaImporte > 0) ? (
                     <div className="text-xs">
                       <div className="text-[#617589] dark:text-slate-400">
-                        {reporte.magna.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                        {reporte.magna.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                       </div>
                       <div className="text-[#617589] dark:text-slate-400 font-semibold">
-                        {reporte.magna.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                        {reporte.magna.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                       </div>
                     </div>
                   ) : (
@@ -111,10 +111,10 @@ export default function TablaReportes({
                   {(reporte.diesel.mermaVolumen > 0 || reporte.diesel.mermaImporte > 0) ? (
                     <div className="text-xs">
                       <div className="text-[#617589] dark:text-slate-400">
-                        {reporte.diesel.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                        {reporte.diesel.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                       </div>
                       <div className="text-[#617589] dark:text-slate-400 font-semibold">
-                        {reporte.diesel.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                        {reporte.diesel.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                       </div>
                     </div>
                   ) : (
@@ -122,7 +122,7 @@ export default function TablaReportes({
                   )}
                 </td>
                 <td className="px-6 py-4 text-right font-bold text-[#111418] dark:text-white">
-                  ${totalVentas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${totalVentas.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                 </td>
                 {showEstado && getEstadoBadge && getEstadoIcon && (
                   <td className="px-6 py-4">

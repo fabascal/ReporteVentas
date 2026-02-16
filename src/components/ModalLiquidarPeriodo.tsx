@@ -66,7 +66,7 @@ export default function ModalLiquidarPeriodo({
             <ul className="mt-2 text-sm">
               {estacionesPendientes.map((e: any) => (
                 <li key={e.nombre}>
-                  {e.nombre}: ${e.saldo.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  {e.nombre}: ${e.saldo.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                 </li>
               ))}
             </ul>
@@ -137,13 +137,13 @@ export default function ModalLiquidarPeriodo({
               <div>
                 <div className="text-sm text-[#60758a] dark:text-gray-400">Resguardo en Zona</div>
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  ${resguardo_zona.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  ${resguardo_zona.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                 </div>
               </div>
               <div>
                 <div className="text-sm text-[#60758a] dark:text-gray-400">Pendiente en Estaciones</div>
                 <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                  ${saldo_pendiente.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                  ${saldo_pendiente.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                 </div>
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function ModalLiquidarPeriodo({
                       {est.estacion_nombre}
                     </span>
                     <span className="font-bold text-orange-600 dark:text-orange-400">
-                      ${parseFloat(est.saldo_resguardo.toString()).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      ${parseFloat(est.saldo_resguardo.toString()).toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                     </span>
                   </div>
                 ))}

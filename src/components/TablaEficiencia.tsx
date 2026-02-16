@@ -12,11 +12,11 @@ export default function TablaEficiencia({
   handleExportarExcel,
 }: TablaEficienciaProps) {
   const formatPercent = (value: number) => {
-    return new Intl.NumberFormat('es-MX', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 100)
+    return new Intl.NumberFormat('es-MX', { style: 'percent', minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value / 100)
   }
 
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value)
   }
 
   const getEfficiencyColor = (value: number) => {

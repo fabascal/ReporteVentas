@@ -346,13 +346,13 @@ export default function ReporteRevisionMensual() {
 
   const formatNumber = (value: number | undefined): string => {
     if (value === undefined || value === null) return '0.00'
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value)
   }
 
   const formatInputNumber = (value: string): string => {
     const num = parseFloat(value.replace(/,/g, ''))
     if (isNaN(num)) return ''
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num)
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(num)
   }
 
   const parseInputNumber = (value: string): number => {
@@ -845,7 +845,7 @@ export default function ReporteRevisionMensual() {
   const calcularDC = (reporteId: string, tipoProducto: string, reporte: any): number => {
     const compras = getValor(reporteId, tipoProducto, 'compras', reporte.compras)
     const cct = getValor(reporteId, tipoProducto, 'cct', reporte.cct)
-    return compras - cct
+    return cct - compras
   }
 
   // Calcular Dif V.DSC = (CCT + V.DSC) - C
@@ -1062,49 +1062,57 @@ export default function ReporteRevisionMensual() {
                 <h3 className="text-sm font-bold text-[#111418] dark:text-white">Acumulado del Mes</h3>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-xs border-collapse">
+                <table className="w-full text-base border-collapse">
                   <thead>
                     <tr className="border-b border-[#e6e8eb] dark:border-slate-700">
-                      <th className="text-left py-1 px-2 font-semibold text-[#111418] dark:text-white">Producto</th>
-                      <th className="text-right py-1 px-2 font-semibold text-[#111418] dark:text-white">ER</th>
-                      <th className="text-right py-1 px-2 font-semibold text-[#111418] dark:text-white">ER%</th>
-                      <th className="text-right py-1 px-2 font-semibold text-[#111418] dark:text-white">E</th>
-                      <th className="text-right py-1 px-2 font-semibold text-[#111418] dark:text-white">E%</th>
-                      <th className="text-right py-1 px-2 font-semibold text-[#111418] dark:text-white">+</th>
-                      <th className="text-right py-1 px-2 font-semibold text-[#111418] dark:text-white">%</th>
+                      <th className="text-left py-2 px-3 font-bold text-[#111418] dark:text-white">Producto</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">V</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">Merma Vol</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">ER</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">ER%</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">E</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">E%</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">+</th>
+                      <th className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">%</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="border-b border-[#e6e8eb] dark:border-slate-700">
-                      <td className="py-1 px-2 text-[#111418] dark:text-white">1 - Premium</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.er)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.erPorcentaje)}%</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.e)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.ePorcentaje)}%</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.mas)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.porcentaje)}%</td>
+                      <td className="py-2 px-3 font-semibold text-[#111418] dark:text-white">1 - Premium</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.v)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.e)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.er)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.erPorcentaje)}%</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.e)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.ePorcentaje)}%</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.mas)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.premium.porcentaje)}%</td>
                     </tr>
                     <tr className="border-b border-[#e6e8eb] dark:border-slate-700">
-                      <td className="py-1 px-2 text-[#111418] dark:text-white">2 - Magna</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.er)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.erPorcentaje)}%</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.e)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.ePorcentaje)}%</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.mas)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.porcentaje)}%</td>
+                      <td className="py-2 px-3 font-semibold text-[#111418] dark:text-white">2 - Magna</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.v)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.e)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.er)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.erPorcentaje)}%</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.e)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.ePorcentaje)}%</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.mas)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.magna.porcentaje)}%</td>
                     </tr>
                     <tr className="border-b border-[#e6e8eb] dark:border-slate-700">
-                      <td className="py-1 px-2 text-[#111418] dark:text-white">3 - Diesel</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.er)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.erPorcentaje)}%</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.e)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.ePorcentaje)}%</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.mas)}</td>
-                      <td className="text-right py-1 px-2 text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.porcentaje)}%</td>
+                      <td className="py-2 px-3 font-semibold text-[#111418] dark:text-white">3 - Diesel</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.v)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.e)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.er)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.erPorcentaje)}%</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.e)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.ePorcentaje)}%</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.mas)}</td>
+                      <td className="text-right py-2 px-3 font-semibold text-[#111418] dark:text-white">{formatNumber(acumuladosMensuales.diesel.porcentaje)}%</td>
                     </tr>
                     <tr>
-                      <td className="py-1 px-2 font-bold text-[#111418] dark:text-white">Aceites</td>
-                      <td colSpan={6} className="text-right py-1 px-2 font-bold text-[#111418] dark:text-white">${formatNumber(acumuladosMensuales.aceites)}</td>
+                      <td className="py-2 px-3 font-bold text-[#111418] dark:text-white">Aceites</td>
+                      <td colSpan={8} className="text-right py-2 px-3 font-bold text-[#111418] dark:text-white">${formatNumber(acumuladosMensuales.aceites)}</td>
                     </tr>
                   </tbody>
                 </table>

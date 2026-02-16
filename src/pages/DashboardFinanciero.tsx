@@ -86,7 +86,7 @@ export default function DashboardFinanciero() {
 
   const formatNumber = (value: string | number): string => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    return num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
   };
 
   const getMesNombre = (): string[] => {
@@ -579,7 +579,7 @@ function DashboardGerenteZona({ data, formatNumber, getEstadoSaldo }: DashboardG
               <div className="text-2xl font-bold text-[#111418] dark:text-white">${formatNumber(data.zona.gastos_zona)}</div>
             </div>
             <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-              <div className="text-xs font-medium text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-1">Resguardo en Zona</div>
+              <div className="text-xs font-medium text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-1">Saldo Final</div>
               <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">${formatNumber(data.zona.resguardo_actual)}</div>
             </div>
             <div className="p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">

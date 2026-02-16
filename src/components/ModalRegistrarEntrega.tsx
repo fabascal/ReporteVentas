@@ -106,7 +106,7 @@ export default function ModalRegistrarEntrega({
       
       if (montoIngresado > saldoDisponible) {
         // BLOQUEAR si excede el saldo disponible
-        newErrors.monto = `El monto excede el saldo disponible de la estación ($${estacionSeleccionada.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}). No se puede entregar más de lo que tiene.`;
+        newErrors.monto = `El monto excede el saldo disponible de la estación ($${estacionSeleccionada.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}). No se puede entregar más de lo que tiene.`;
       }
     }
 
@@ -271,25 +271,25 @@ export default function ModalRegistrarEntrega({
                 <div>
                   <p className="text-[#617589] dark:text-slate-400">Merma Generada:</p>
                   <p className="font-bold text-green-600 dark:text-green-400">
-                    ${estacionSeleccionada.merma_generada.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    ${estacionSeleccionada.merma_generada.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                   </p>
                 </div>
                 <div>
                   <p className="text-[#617589] dark:text-slate-400">Entregas Anteriores:</p>
                   <p className="font-medium text-[#111418] dark:text-white">
-                    ${estacionSeleccionada.entregas_realizadas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    ${estacionSeleccionada.entregas_realizadas.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                   </p>
                 </div>
                 <div>
                   <p className="text-[#617589] dark:text-slate-400">Gastos Realizados:</p>
                   <p className="font-medium text-[#111418] dark:text-white">
-                    ${estacionSeleccionada.gastos_realizados.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    ${estacionSeleccionada.gastos_realizados.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                   </p>
                 </div>
                 <div className="col-span-2 pt-2 border-t border-blue-200 dark:border-slate-600">
                   <p className="text-[#617589] dark:text-slate-400">En Resguardo:</p>
                   <p className="font-bold text-xl text-blue-600 dark:text-blue-400">
-                    ${estacionSeleccionada.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    ${estacionSeleccionada.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
                   </p>
                 </div>
               </div>

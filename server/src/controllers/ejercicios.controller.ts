@@ -485,7 +485,7 @@ export const ejerciciosController = {
       // Insertar ejercicio
       const result = await pool.query(
         `INSERT INTO ejercicios_fiscales 
-         (anio, nombre, descripcion, fecha_inicio, fecha_fin, estado, created_by)
+         (anio, nombre, descripcion, fecha_inicio, fecha_fin, estado, creado_por)
          VALUES ($1, $2, $3, $4, $5, 'activo', $6)
          RETURNING *`,
         [anio, nombre, descripcion || null, fecha_inicio, fecha_fin, usuario?.id]

@@ -66,7 +66,7 @@ export default function DashboardDirector() {
             </div>
             <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Premium</p>
             <p className="text-3xl font-black text-red-600 dark:text-red-400 tracking-tight">
-              ${totales.premium.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${totales.premium.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
 
@@ -80,7 +80,7 @@ export default function DashboardDirector() {
             </div>
             <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Magna</p>
             <p className="text-3xl font-black text-green-600 dark:text-green-400 tracking-tight">
-              ${totales.magna.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${totales.magna.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
 
@@ -94,7 +94,7 @@ export default function DashboardDirector() {
             </div>
             <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Diesel</p>
             <p className="text-3xl font-black text-gray-700 dark:text-gray-300 tracking-tight">
-              ${totales.diesel.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${totales.diesel.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
 
@@ -107,7 +107,7 @@ export default function DashboardDirector() {
             </div>
             <p className="text-sm font-medium text-[#617589] dark:text-slate-400 mb-1">Total General</p>
             <p className="text-3xl font-black text-[#1173d4] tracking-tight">
-              ${totalGeneral.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${totalGeneral.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
             </p>
           </div>
         </div>
@@ -178,30 +178,30 @@ export default function DashboardDirector() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-xs text-[#617589] dark:text-slate-400">
-                            {reporte.premium.litros.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                            {reporte.premium.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                           </div>
                           {reporte.premium.merma > 0 && (
                             <div className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
-                              Merma: {reporte.premium.merma.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                              Merma: {reporte.premium.merma.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                             </div>
                           )}
                           <div className="font-medium text-red-600 dark:text-red-400 text-sm">
-                            ${reporte.premium.precio.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /L
+                            ${reporte.premium.precio.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} /L
                           </div>
                           <div className="font-semibold text-red-700 dark:text-red-500 mt-1">
-                            ${reporte.premium.importe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ${reporte.premium.importe.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                           </div>
                           {(reporte.premium.mermaVolumen > 0 || reporte.premium.mermaImporte > 0) && (
                             <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800">
                               <div className="text-xs text-orange-600 dark:text-orange-400">
-                                Merma Vol: {reporte.premium.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                                Merma Vol: {reporte.premium.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                               </div>
                               <div className="text-xs text-orange-600 dark:text-orange-400">
-                                Merma $: ${reporte.premium.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                Merma $: ${reporte.premium.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                               </div>
                               {reporte.premium.mermaPorcentaje > 0 && (
                                 <div className="text-xs text-orange-600 dark:text-orange-400 font-semibold">
-                                  {reporte.premium.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                                  {reporte.premium.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                                 </div>
                               )}
                             </div>
@@ -210,53 +210,53 @@ export default function DashboardDirector() {
                             <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
                               <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Inv. y Compras:</div>
                               {reporte.premium.iib > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.I.B.: {reporte.premium.iib.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.I.B.: {reporte.premium.iib.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.premium.compras > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">C: {reporte.premium.compras.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">C: {reporte.premium.compras.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.premium.cct > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">CCT: {reporte.premium.cct.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">CCT: {reporte.premium.cct.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.premium.vDsc > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">V.Dsc: {reporte.premium.vDsc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">V.Dsc: {reporte.premium.vDsc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.premium.dc !== undefined && reporte.premium.dc !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">DC: {reporte.premium.dc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">DC: {reporte.premium.dc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.premium.difVDsc !== undefined && reporte.premium.difVDsc !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">Dif V.Dsc: {reporte.premium.difVDsc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">Dif V.Dsc: {reporte.premium.difVDsc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.premium.if !== undefined && reporte.premium.if !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.: {reporte.premium.if.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.: {reporte.premium.if.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.premium.iffb > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.F.B.: {reporte.premium.iffb.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.F.B.: {reporte.premium.iffb.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                             </div>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-xs text-[#617589] dark:text-slate-400">
-                            {reporte.magna.litros.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                            {reporte.magna.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                           </div>
                           <div className="font-medium text-green-600 dark:text-green-400 text-sm">
-                            ${reporte.magna.precio.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /L
+                            ${reporte.magna.precio.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} /L
                           </div>
                           <div className="font-semibold text-green-700 dark:text-green-500 mt-1">
-                            ${reporte.magna.importe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ${reporte.magna.importe.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                           </div>
                           {(reporte.magna.mermaVolumen > 0 || reporte.magna.mermaImporte > 0) && (
                             <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-800">
                               <div className="text-xs text-orange-600 dark:text-orange-400">
-                                Merma Vol: {reporte.magna.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                                Merma Vol: {reporte.magna.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                               </div>
                               <div className="text-xs text-orange-600 dark:text-orange-400">
-                                Merma $: ${reporte.magna.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                Merma $: ${reporte.magna.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                               </div>
                               {reporte.magna.mermaPorcentaje > 0 && (
                                 <div className="text-xs text-orange-600 dark:text-orange-400 font-semibold">
-                                  {reporte.magna.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                                  {reporte.magna.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                                 </div>
                               )}
                             </div>
@@ -265,53 +265,53 @@ export default function DashboardDirector() {
                             <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
                               <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Inv. y Compras:</div>
                               {reporte.magna.iib > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.I.B.: {reporte.magna.iib.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.I.B.: {reporte.magna.iib.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.magna.compras > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">C: {reporte.magna.compras.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">C: {reporte.magna.compras.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.magna.cct > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">CCT: {reporte.magna.cct.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">CCT: {reporte.magna.cct.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.magna.vDsc > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">V.Dsc: {reporte.magna.vDsc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">V.Dsc: {reporte.magna.vDsc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.magna.dc !== undefined && reporte.magna.dc !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">DC: {reporte.magna.dc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">DC: {reporte.magna.dc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.magna.difVDsc !== undefined && reporte.magna.difVDsc !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">Dif V.Dsc: {reporte.magna.difVDsc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">Dif V.Dsc: {reporte.magna.difVDsc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.magna.if !== undefined && reporte.magna.if !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.: {reporte.magna.if.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.: {reporte.magna.if.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.magna.iffb > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.F.B.: {reporte.magna.iffb.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.F.B.: {reporte.magna.iffb.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                             </div>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-xs text-[#617589] dark:text-slate-400">
-                            {reporte.diesel.litros.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                            {reporte.diesel.litros.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                           </div>
                           <div className="font-medium text-gray-700 dark:text-gray-300 text-sm">
-                            ${reporte.diesel.precio.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /L
+                            ${reporte.diesel.precio.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} /L
                           </div>
                           <div className="font-semibold text-gray-800 dark:text-gray-200 mt-1">
-                            ${reporte.diesel.importe.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            ${reporte.diesel.importe.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                           </div>
                           {(reporte.diesel.mermaVolumen > 0 || reporte.diesel.mermaImporte > 0) && (
                             <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                               <div className="text-xs text-orange-600 dark:text-orange-400">
-                                Merma Vol: {reporte.diesel.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                                Merma Vol: {reporte.diesel.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                               </div>
                               <div className="text-xs text-orange-600 dark:text-orange-400">
-                                Merma $: ${reporte.diesel.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                Merma $: ${reporte.diesel.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                               </div>
                               {reporte.diesel.mermaPorcentaje > 0 && (
                                 <div className="text-xs text-orange-600 dark:text-orange-400 font-semibold">
-                                  {reporte.diesel.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                                  {reporte.diesel.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                                 </div>
                               )}
                             </div>
@@ -320,34 +320,34 @@ export default function DashboardDirector() {
                             <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
                               <div className="text-xs font-semibold text-blue-600 dark:text-blue-400 mb-1">Inv. y Compras:</div>
                               {reporte.diesel.iib > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.I.B.: {reporte.diesel.iib.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.I.B.: {reporte.diesel.iib.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.diesel.compras > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">C: {reporte.diesel.compras.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">C: {reporte.diesel.compras.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.diesel.cct > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">CCT: {reporte.diesel.cct.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">CCT: {reporte.diesel.cct.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.diesel.vDsc > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">V.Dsc: {reporte.diesel.vDsc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">V.Dsc: {reporte.diesel.vDsc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.diesel.dc !== undefined && reporte.diesel.dc !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">DC: {reporte.diesel.dc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">DC: {reporte.diesel.dc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.diesel.difVDsc !== undefined && reporte.diesel.difVDsc !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">Dif V.Dsc: {reporte.diesel.difVDsc.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">Dif V.Dsc: {reporte.diesel.difVDsc.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.diesel.if !== undefined && reporte.diesel.if !== 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.: {reporte.diesel.if.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.: {reporte.diesel.if.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                               {reporte.diesel.iffb > 0 && (
-                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.F.B.: {reporte.diesel.iffb.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                                <div className="text-xs text-blue-600 dark:text-blue-400">I.F.F.B.: {reporte.diesel.iffb.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</div>
                               )}
                             </div>
                           )}
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-[#111418] dark:text-white">
-                          ${totalVentas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          ${totalVentas.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-[#111418] dark:text-white">{reporte.revisadoPor || 'N/A'}</div>

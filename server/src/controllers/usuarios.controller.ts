@@ -329,11 +329,13 @@ export const usuariosController = {
       const { id } = req.params
       const { zonas } = req.body
 
-      // Verificar que el usuario existe
-      const userResult = await pool.query('SELECT id FROM users WHERE id = $1', [id])
+      // Verificar que el usuario existe y obtener su rol
+      const userResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [id])
       if (userResult.rows.length === 0) {
         return res.status(404).json({ message: 'Usuario no encontrado' })
       }
+
+      const usuario = userResult.rows[0]
 
       // Eliminar asignaciones existentes
       await pool.query('DELETE FROM user_zonas WHERE user_id = $1', [id])
@@ -344,6 +346,29 @@ export const usuariosController = {
           await pool.query(
             'INSERT INTO user_zonas (user_id, zona_id) VALUES ($1, $2)',
             [id, zonaId]
+          )
+        }
+
+        // IMPORTANTE: Si el usuario es Gerente de Zona, actualizar también el campo zona_id en users
+        // Este campo se usa para filtrar los reportes que puede ver el gerente
+        if (usuario.role === 'GerenteZona' && zonas.length === 1) {
+          await pool.query(
+            'UPDATE users SET zona_id = $1, updated_at = NOW() WHERE id = $2',
+            [zonas[0], id]
+          )
+        } else if (usuario.role === 'GerenteZona' && zonas.length === 0) {
+          // Si se quitan todas las zonas, limpiar el campo zona_id
+          await pool.query(
+            'UPDATE users SET zona_id = NULL, updated_at = NOW() WHERE id = $1',
+            [id]
+          )
+        }
+      } else {
+        // Si no se asignan zonas, limpiar el campo zona_id para Gerentes de Zona
+        if (usuario.role === 'GerenteZona') {
+          await pool.query(
+            'UPDATE users SET zona_id = NULL, updated_at = NOW() WHERE id = $1',
+            [id]
           )
         }
       }

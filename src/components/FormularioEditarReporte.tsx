@@ -328,7 +328,7 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
     const numStr = value.toString().replace(/,/g, '')
     const num = parseFloat(numStr)
     if (isNaN(num)) return ''
-    return num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return num.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })
   }
 
   // Función para convertir valor formateado de vuelta a número (sin formato)
@@ -665,19 +665,19 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Volumen Merma (L)</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    {reporte.premium.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                    {reporte.premium.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Importe Merma</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    ${reporte.premium.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${reporte.premium.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Porcentaje Merma</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    {reporte.premium.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                    {reporte.premium.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                   </p>
                 </div>
               </div>
@@ -823,19 +823,19 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Volumen Merma (L)</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    {reporte.magna.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                    {reporte.magna.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Importe Merma</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    ${reporte.magna.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${reporte.magna.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Porcentaje Merma</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    {reporte.magna.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                    {reporte.magna.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                   </p>
                 </div>
               </div>
@@ -981,19 +981,19 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Volumen Merma (L)</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    {reporte.diesel.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L
+                    {reporte.diesel.mermaVolumen.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} L
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Importe Merma</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    ${reporte.diesel.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ${reporte.diesel.mermaImporte.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-[#617589] dark:text-slate-400 mb-1">Porcentaje Merma</p>
                   <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">
-                    {reporte.diesel.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
+                    {reporte.diesel.mermaPorcentaje.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
                   </p>
                 </div>
               </div>

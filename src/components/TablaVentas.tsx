@@ -17,7 +17,7 @@ export default function TablaVentas({
   }
 
   const formatLitros = (litros: number) => {
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(litros) + ' L'
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(litros) + ' L'
   }
 
   return (
