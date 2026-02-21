@@ -11,6 +11,10 @@ const routeTitles: Record<string, string> = {
   '/gerente-estacion': 'Portal Gerente de Estación',
   '/gerente-zona': 'Portal Gerente de Zona',
   '/director': 'Portal Director',
+  '/director/reportes': 'Reportes - Director',
+  '/director/reportes/er': 'Reporte ER - Director',
+  '/director/reportes/r': 'Reporte R - Director',
+  '/director/reportes/conciliacion': 'Reporte Conciliación - Director',
 }
 
 export default function DocumentTitle() {

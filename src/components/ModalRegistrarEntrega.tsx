@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { sileo } from 'sileo';
 import financieroService from '../services/financieroService';
-import toast from 'react-hot-toast';
 
 interface EstacionFinanciera {
   estacion_id: string;
@@ -14,16 +14,12 @@ interface EstacionFinanciera {
 
 interface ModalRegistrarEntregaProps {
   estaciones: EstacionFinanciera[];
-  zona_id: string;
-  zona_nombre: string;
   onClose: () => void;
   periodo: { mes: number; anio: number };
 }
 
 export default function ModalRegistrarEntrega({ 
   estaciones, 
-  zona_id,
-  zona_nombre,
   onClose, 
   periodo 
 }: ModalRegistrarEntregaProps) {
@@ -34,6 +30,7 @@ export default function ModalRegistrarEntrega({
     fecha: new Date().toISOString().split('T')[0],
     monto: '',
     concepto: '',
+    archivo: null as File | null,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -74,7 +71,7 @@ export default function ModalRegistrarEntrega({
   const registrarMutation = useMutation({
     mutationFn: (data: any) => financieroService.registrarEntrega(data),
     onSuccess: () => {
-      toast.success('Entrega registrada exitosamente');
+      sileo.success({ title: 'Entrega registrada exitosamente' });
       // Invalidar todas las queries relacionadas con el dashboard y resguardo
       queryClient.invalidateQueries({ queryKey: ['dashboard-financiero'] });
       queryClient.invalidateQueries({ queryKey: ['entregas'] });
@@ -84,7 +81,7 @@ export default function ModalRegistrarEntrega({
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || 'Error al registrar la entrega';
-      toast.error(errorMessage);
+      sileo.error({ title: errorMessage });
     },
   });
 
@@ -97,6 +94,9 @@ export default function ModalRegistrarEntrega({
     if (!formData.fecha) {
       newErrors.fecha = 'Ingrese la fecha de la entrega';
     }
+    if (!formData.archivo) {
+      newErrors.archivo = 'Adjunte el archivo de evidencia (obligatorio)';
+    }
     if (!formData.monto || parseFloat(formData.monto) <= 0) {
       newErrors.monto = 'Ingrese un monto válido mayor a cero';
     } else if (estacionSeleccionada) {
@@ -105,8 +105,8 @@ export default function ModalRegistrarEntrega({
       const saldoDisponible = Math.round(estacionSeleccionada.saldo_resguardo * 100) / 100;
       
       if (montoIngresado > saldoDisponible) {
-        // BLOQUEAR si excede el saldo disponible
-        newErrors.monto = `El monto excede el saldo disponible de la estación ($${estacionSeleccionada.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}). No se puede entregar más de lo que tiene.`;
+        // Aviso solamente: se permite sobre-entrega por regla de negocio.
+        newErrors.monto = `⚠️ El monto excede el saldo disponible de la estación ($${estacionSeleccionada.saldo_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}). Se registrará como sobre-entrega.`;
       }
     }
 
@@ -124,10 +124,10 @@ export default function ModalRegistrarEntrega({
     registrarMutation.mutate({
       tipo_entrega: 'estacion_zona',
       estacion_id: formData.estacion_id,
-      zona_id: zona_id,
       fecha: formData.fecha,
       monto: parseFloat(formData.monto),
       concepto: formData.concepto || `Entrega de ${estacionSeleccionada?.estacion_nombre}`,
+      archivo: formData.archivo || undefined,
     });
   };
 
@@ -146,12 +146,12 @@ export default function ModalRegistrarEntrega({
           <div>
             <h2 className="text-2xl font-bold text-[#111418] dark:text-white">Registrar Entrega de Estación</h2>
             <p className="text-sm text-[#60758a] dark:text-gray-400 mt-1">
-              {zona_nombre} - {new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(
+              {new Intl.DateTimeFormat('es-MX', { month: 'long', year: 'numeric' }).format(
                 new Date(periodo.anio, periodo.mes - 1)
               )}
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
-              💰 Recibir dinero de una estación hacia la zona
+              💰 Registrar solicitud de entrega (requiere firma de gerente de zona)
             </p>
           </div>
           <button
@@ -360,6 +360,35 @@ export default function ModalRegistrarEntrega({
               rows={3}
               className="w-full px-4 py-3 rounded-lg border border-[#dbe0e6] dark:border-slate-600 bg-white dark:bg-[#0d1b2a] text-[#111418] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1173d4] resize-none transition-colors"
             />
+          </div>
+
+          {/* Archivo obligatorio */}
+          <div>
+            <label className="block text-sm font-semibold text-[#111418] dark:text-white mb-2">
+              Archivo de evidencia <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null
+                setFormData({ ...formData, archivo: file })
+                if (errors.archivo) {
+                  setErrors({ ...errors, archivo: '' })
+                }
+              }}
+              className={`w-full px-4 py-3 rounded-lg border ${
+                errors.archivo
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-[#dbe0e6] dark:border-slate-600 focus:ring-[#1173d4]'
+              } bg-white dark:bg-[#0d1b2a] text-[#111418] dark:text-white focus:outline-none focus:ring-2 transition-colors`}
+            />
+            {errors.archivo && (
+              <p className="text-red-500 text-sm mt-1">{errors.archivo}</p>
+            )}
+            <p className="text-xs text-[#60758a] dark:text-slate-400 mt-1">
+              Formatos permitidos: PDF o imagen. Tamaño máximo: 10MB.
+            </p>
           </div>
 
           {/* Actions */}

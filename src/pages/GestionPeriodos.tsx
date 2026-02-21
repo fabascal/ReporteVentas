@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { sileo } from 'sileo';
 import ejerciciosService, { EjercicioFiscal, PeriodoMensual, ZonaDetalle } from '../services/ejerciciosService';
 import DynamicHeader from '../components/DynamicHeader';
-import toast from 'react-hot-toast';
 
 export default function GestionPeriodos() {
   const queryClient = useQueryClient();
@@ -42,7 +42,7 @@ export default function GestionPeriodos() {
     mutationFn: (data: { anio: number; nombre: string; descripcion?: string }) =>
       ejerciciosService.create(data),
     onSuccess: () => {
-      toast.success('Ejercicio fiscal creado exitosamente');
+      sileo.success({ title: 'Ejercicio fiscal creado exitosamente' });
       queryClient.invalidateQueries({ queryKey: ['ejercicios'] });
       queryClient.invalidateQueries({ queryKey: ['ejercicios-activos'] });
       setShowModalNuevo(false);
@@ -53,7 +53,7 @@ export default function GestionPeriodos() {
       });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Error al crear ejercicio');
+      sileo.error({ title: error.response?.data?.error || 'Error al crear ejercicio' });
     },
   });
 
@@ -67,12 +67,12 @@ export default function GestionPeriodos() {
         inactivo: 'desactivado',
         cerrado: 'cerrado'
       };
-      toast.success(`Ejercicio ${estadoLabels[variables.estado]} exitosamente`);
+      sileo.success({ title: `Ejercicio ${estadoLabels[variables.estado]} exitosamente` });
       queryClient.invalidateQueries({ queryKey: ['ejercicios'] });
       queryClient.invalidateQueries({ queryKey: ['ejercicios-activos'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Error al actualizar ejercicio');
+      sileo.error({ title: error.response?.data?.error || 'Error al actualizar ejercicio' });
     },
   });
 
@@ -83,11 +83,11 @@ export default function GestionPeriodos() {
         ? ejerciciosService.cerrarPeriodoOperativo(zona_id, anio, mes)
         : ejerciciosService.reabrirPeriodoOperativo(zona_id, anio, mes),
     onSuccess: (_, variables) => {
-      toast.success(`Periodo operativo ${variables.accion === 'cerrar' ? 'cerrado' : 'reabierto'} exitosamente`);
+      sileo.success({ title: `Periodo operativo ${variables.accion === 'cerrar' ? 'cerrado' : 'reabierto'} exitosamente` });
       queryClient.invalidateQueries({ queryKey: ['periodos', expandedEjercicio] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Error al modificar periodo operativo');
+      sileo.error({ title: error.response?.data?.error || 'Error al modificar periodo operativo' });
     },
   });
 
@@ -98,14 +98,14 @@ export default function GestionPeriodos() {
         ? ejerciciosService.cerrarPeriodoContable(zona_id, anio, mes, observaciones)
         : ejerciciosService.reabrirPeriodoContable(zona_id, anio, mes),
     onSuccess: (_, variables) => {
-      toast.success(`Periodo contable ${variables.accion === 'cerrar' ? 'cerrado' : 'reabierto'} exitosamente`);
+      sileo.success({ title: `Periodo contable ${variables.accion === 'cerrar' ? 'cerrado' : 'reabierto'} exitosamente` });
       queryClient.invalidateQueries({ queryKey: ['periodos', expandedEjercicio] });
       setShowModalObservaciones(false);
       setPeriodoSeleccionado(null);
       setObservaciones('');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error || 'Error al modificar periodo contable');
+      sileo.error({ title: error.response?.data?.error || 'Error al modificar periodo contable' });
     },
   });
 
@@ -115,7 +115,7 @@ export default function GestionPeriodos() {
 
   const handleCreateEjercicio = () => {
     if (!nuevoEjercicio.anio || !nuevoEjercicio.nombre) {
-      toast.error('Año y nombre son requeridos');
+      sileo.warning({ title: 'Año y nombre son requeridos' });
       return;
     }
     createMutation.mutate(nuevoEjercicio);

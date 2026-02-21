@@ -3,7 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../contexts/AuthContext'
 import { usuariosService, UsuarioCompleto, CreateUsuarioData, UpdateUsuarioData, Zona, Estacion } from '../../services/usuariosService'
 import { reportesService } from '../../services/reportesService'
+import { rolesService } from '../../services/rolesService'
 import { Role } from '../../types/auth'
+import { sileo } from 'sileo'
 
 export default function VistaUsuarios() {
   const { user } = useAuth()
@@ -30,6 +32,10 @@ export default function VistaUsuarios() {
   const { data: estaciones = [] } = useQuery({
     queryKey: ['estaciones'],
     queryFn: reportesService.getEstaciones,
+  })
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesService.getRoles,
   })
 
   // Crear usuario
@@ -87,13 +93,13 @@ export default function VistaUsuarios() {
 
   const handleDelete = (id: string) => {
     if (id === user?.id) {
-      alert('No puedes eliminar tu propio usuario')
+      sileo.error({ title: 'No puedes eliminar tu propio usuario' })
       return
     }
     deleteMutation.mutate(id)
   }
 
-  const getRoleBadgeColor = (role: Role) => {
+  const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case Role.Administrador:
         return 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400'
@@ -278,6 +284,7 @@ export default function VistaUsuarios() {
       {/* Modal Crear Usuario */}
       {showCreateModal && (
         <CreateUsuarioModal
+          availableRoles={roles.map((role) => role.codigo)}
           zonas={zonas}
           estaciones={estaciones}
           onClose={() => setShowCreateModal(false)}
@@ -289,6 +296,7 @@ export default function VistaUsuarios() {
       {/* Modal Editar Usuario */}
       {showEditModal && selectedUsuario && (
         <EditUsuarioModal
+          availableRoles={roles.map((role) => role.codigo)}
           usuario={selectedUsuario}
           onClose={() => {
             setShowEditModal(false)
@@ -330,23 +338,29 @@ export default function VistaUsuarios() {
 
 // Modal para crear usuario
 function CreateUsuarioModal({
+  availableRoles,
   zonas,
   estaciones,
   onClose,
   onCreate,
   isLoading,
 }: {
+  availableRoles: string[]
   zonas: Zona[]
   estaciones: Estacion[]
   onClose: () => void
   onCreate: (data: CreateUsuarioData) => void
   isLoading: boolean
 }) {
+  const roleOptions =
+    availableRoles.length > 0
+      ? availableRoles
+      : ['Administrador', 'GerenteEstacion', 'GerenteZona', 'Direccion']
   const [formData, setFormData] = useState<CreateUsuarioData>({
     email: '',
     password: '',
     name: '',
-    role: Role.GerenteEstacion,
+    role: roleOptions.includes('GerenteEstacion') ? 'GerenteEstacion' : (roleOptions[0] ?? 'GerenteEstacion'),
     estaciones: [],
     zonas: [],
   })
@@ -423,10 +437,10 @@ function CreateUsuarioModal({
             <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-1">Rol *</label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as Role })}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
             >
-              {Object.values(Role).map((role) => (
+              {roleOptions.map((role) => (
                 <option key={role} value={role}>
                   {role}
                 </option>
@@ -508,16 +522,22 @@ function CreateUsuarioModal({
 
 // Modal para editar usuario
 function EditUsuarioModal({
+  availableRoles,
   usuario,
   onClose,
   onUpdate,
   isLoading,
 }: {
+  availableRoles: string[]
   usuario: UsuarioCompleto
   onClose: () => void
   onUpdate: (data: UpdateUsuarioData) => void
   isLoading: boolean
 }) {
+  const roleOptions =
+    availableRoles.length > 0
+      ? availableRoles
+      : ['Administrador', 'GerenteEstacion', 'GerenteZona', 'Direccion']
   const [formData, setFormData] = useState<UpdateUsuarioData>({
     email: usuario.email,
     name: usuario.name,
@@ -598,10 +618,10 @@ function EditUsuarioModal({
             <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-1">Rol *</label>
             <select
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value as Role })}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
             >
-              {Object.values(Role).map((role) => (
+              {roleOptions.map((role) => (
                 <option key={role} value={role}>
                   {role}
                 </option>

@@ -131,7 +131,21 @@ export const obtenerControlFinanciero = async (req: Request, res: Response) => {
     console.log('[obtenerControlFinanciero] Primera estación:', saldosResult.rows[0]);
     
     // Calcular totales de la zona
-    const saldoInicial = 0; // TODO: Implementar saldo inicial de períodos anteriores
+    const anioAnterior = anioInt - (mesInt === 1 ? 1 : 0);
+    const mesAnterior = mesInt === 1 ? 12 : mesInt - 1;
+    const saldoInicialResult = await pool.query(
+      `SELECT saldo_final
+       FROM liquidaciones_mensuales
+       WHERE zona_id = $1
+         AND estacion_id IS NULL
+         AND anio = $2
+         AND mes = $3
+         AND estado = 'cerrado'
+       ORDER BY fecha_cierre DESC
+       LIMIT 1`,
+      [zonaIdFinal, anioAnterior, mesAnterior]
+    );
+    const saldoInicial = parseFloat(saldoInicialResult.rows[0]?.saldo_final || '0');
     const entregasRecibidas = 0; // TODO: Implementar entregas recibidas
     const entregasDireccion = 0; // TODO: Implementar entregas a dirección
     const gastosZona = 0; // TODO: Implementar gastos de zona

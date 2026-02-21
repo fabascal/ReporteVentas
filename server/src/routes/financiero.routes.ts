@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
 import { 
   getDashboardFinanciero, 
   getAlertas, 
@@ -6,15 +9,34 @@ import {
   obtenerGastos,
   registrarEntrega,
   obtenerEntregas,
+  obtenerEntregasPendientesFirma,
+  obtenerFirmantesDireccion,
+  firmarEntrega,
   verificarEstadoPeriodo,
   obtenerLimiteDisponible,
   obtenerResguardoEstacion,
   cerrarPeriodoContable,
   reabrirPeriodoContable
 } from '../controllers/financiero.controller.js';
-import { authenticateToken } from '../middleware/auth.middleware.js';
+import { authenticateToken, requireMenuAccess } from '../middleware/auth.middleware.js';
 
 const router = Router();
+
+const uploadsDir = path.join(process.cwd(), 'uploads', 'entregas');
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadsDir),
+  filename: (_req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${Date.now()}-${safeName}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+});
 
 // Todas las rutas requieren autenticación
 router.use(authenticateToken);
@@ -23,7 +45,7 @@ router.use(authenticateToken);
  * GET /api/financiero/dashboard
  * Obtener dashboard financiero según el rol del usuario
  */
-router.get('/dashboard', getDashboardFinanciero);
+router.get('/dashboard', requireMenuAccess('/dashboard-financiero'), getDashboardFinanciero);
 
 /**
  * GET /api/financiero/alertas
@@ -48,6 +70,10 @@ router.get('/gastos', obtenerGastos);
  * Registrar una entrega (estación→zona o zona→dirección)
  */
 router.post('/entregas', registrarEntrega);
+router.post('/entregas-con-archivo', upload.single('archivo'), registrarEntrega);
+router.get('/entregas/firmantes-direccion', obtenerFirmantesDireccion);
+router.get('/entregas/pendientes-firma', obtenerEntregasPendientesFirma);
+router.post('/entregas/:id/firmar', firmarEntrega);
 
 /**
  * GET /api/financiero/entregas

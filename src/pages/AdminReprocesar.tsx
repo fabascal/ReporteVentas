@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
+import { sileo } from 'sileo'
 import { reportesService } from '../services/reportesService'
 import axios from 'axios'
 import { ArrowLeft, RefreshCw, Calendar, Building2, AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react'
@@ -81,18 +82,18 @@ export default function AdminReprocesar() {
 
   const handleReprocesar = () => {
     if (!estacionSeleccionada || !fechaInicio || !fechaFin) {
-      alert('Por favor completa todos los campos')
+      sileo.warning({ title: 'Por favor completa todos los campos' })
       return
     }
 
     if (fechaInicio > fechaFin) {
-      alert('La fecha de inicio debe ser menor o igual a la fecha de fin')
+      sileo.warning({ title: 'La fecha de inicio debe ser menor o igual a la fecha de fin' })
       return
     }
 
     const estacion = estaciones?.find(e => e.id === estacionSeleccionada)
     if (!estacion?.identificadorExterno) {
-      alert('La estación seleccionada no tiene identificador externo configurado')
+      sileo.warning({ title: 'La estación seleccionada no tiene identificador externo configurado' })
       return
     }
 

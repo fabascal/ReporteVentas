@@ -136,7 +136,11 @@ export default function DynamicHeader({ activeViewId, onViewChange }: DynamicHea
       }
       return false
     } else if (item.type === 'view' && item.view_id) {
-      if (onViewChange) {
+      if (activeViewId !== undefined) {
+        // Si el contenedor define una vista activa explícita (ej: Director),
+        // usarla para marcar el menú activo aunque no exista onViewChange.
+        return activeViewId === item.view_id
+      } else if (onViewChange) {
         // Para dashboards con vistas internas
         return activeViewId === item.view_id
       } else if (item.view_id) {

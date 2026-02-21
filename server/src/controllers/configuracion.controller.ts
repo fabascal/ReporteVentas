@@ -1,17 +1,26 @@
 import { Response } from 'express'
 import { pool } from '../config/database.js'
 import { AuthRequest } from '../middleware/auth.middleware.js'
+import { backupService } from '../services/backup.service.js'
+import { Role } from '../types/auth.js'
 
 export const configuracionController = {
+  ensureAdmin(req: AuthRequest, res: Response) {
+    if (!req.user) {
+      res.status(401).json({ message: 'No autenticado' })
+      return false
+    }
+    if (req.user.role !== Role.Administrador) {
+      res.status(403).json({ message: 'No tienes permiso para acceder a la configuración' })
+      return false
+    }
+    return true
+  },
+
   async getConfiguracion(req: AuthRequest, res: Response) {
     try {
-      if (!req.user) {
-        return res.status(401).json({ message: 'No autenticado' })
-      }
-
-      // Solo administradores pueden ver la configuración
-      if (req.user.role !== 'Administrador') {
-        return res.status(403).json({ message: 'No tienes permiso para acceder a la configuración' })
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
       }
 
       const result = await pool.query('SELECT clave, valor, descripcion FROM configuracion ORDER BY clave')
@@ -30,13 +39,8 @@ export const configuracionController = {
 
   async updateConfiguracion(req: AuthRequest, res: Response) {
     try {
-      if (!req.user) {
-        return res.status(401).json({ message: 'No autenticado' })
-      }
-
-      // Solo administradores pueden actualizar la configuración
-      if (req.user.role !== 'Administrador') {
-        return res.status(403).json({ message: 'No tienes permiso para actualizar la configuración' })
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
       }
 
       const { configuracion } = req.body
@@ -67,13 +71,8 @@ export const configuracionController = {
 
   async getConfiguracionAPI(req: AuthRequest, res: Response) {
     try {
-      if (!req.user) {
-        return res.status(401).json({ message: 'No autenticado' })
-      }
-
-      // Solo administradores pueden ver la configuración de API
-      if (req.user.role !== 'Administrador') {
-        return res.status(403).json({ message: 'No tienes permiso para acceder a la configuración de API' })
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
       }
 
       const result = await pool.query(
@@ -103,13 +102,8 @@ export const configuracionController = {
 
   async updateConfiguracionAPI(req: AuthRequest, res: Response) {
     try {
-      if (!req.user) {
-        return res.status(401).json({ message: 'No autenticado' })
-      }
-
-      // Solo administradores pueden actualizar la configuración de API
-      if (req.user.role !== 'Administrador') {
-        return res.status(403).json({ message: 'No tienes permiso para actualizar la configuración de API' })
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
       }
 
       const { apiUsuario, apiContrasena } = req.body
@@ -143,6 +137,126 @@ export const configuracionController = {
     } catch (error) {
       console.error('Error al actualizar configuración de API:', error)
       res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async getBackupSettings(req: AuthRequest, res: Response) {
+    try {
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
+      }
+
+      const settings = await backupService.getSettings()
+      res.json(settings)
+    } catch (error) {
+      console.error('Error al obtener configuración de respaldos:', error)
+      res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async updateBackupSettings(req: AuthRequest, res: Response) {
+    try {
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
+      }
+
+      const updated = await backupService.updateSettings(req.body || {})
+      res.json({
+        message: 'Configuración de respaldos actualizada exitosamente',
+        settings: updated,
+      })
+    } catch (error: any) {
+      console.error('Error al actualizar configuración de respaldos:', error)
+      res.status(500).json({ message: error.message || 'Error interno del servidor' })
+    }
+  },
+
+  async listBackups(req: AuthRequest, res: Response) {
+    try {
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
+      }
+
+      const backups = await backupService.listBackups()
+      res.json({ backups })
+    } catch (error) {
+      console.error('Error al listar respaldos:', error)
+      res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async createManualBackup(req: AuthRequest, res: Response) {
+    try {
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
+      }
+
+      const backup = await backupService.createBackup({
+        mode: 'manual',
+        requestedBy: req.user?.id,
+      })
+      res.json({
+        message: 'Respaldo creado exitosamente',
+        backup,
+      })
+    } catch (error: any) {
+      console.error('Error al crear respaldo manual:', error)
+      res.status(500).json({ message: error.message || 'Error interno del servidor' })
+    }
+  },
+
+  async downloadBackup(req: AuthRequest, res: Response) {
+    try {
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
+      }
+
+      const fileName = req.params.fileName
+      const filePath = backupService.resolveBackupPath(fileName)
+      res.download(filePath, fileName)
+    } catch (error: any) {
+      console.error('Error al descargar respaldo:', error)
+      res.status(400).json({ message: error.message || 'No se pudo descargar el respaldo' })
+    }
+  },
+
+  async deleteBackup(req: AuthRequest, res: Response) {
+    try {
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
+      }
+
+      const fileName = req.params.fileName
+      await backupService.deleteBackup(fileName)
+      res.json({ message: 'Respaldo eliminado exitosamente' })
+    } catch (error: any) {
+      console.error('Error al eliminar respaldo:', error)
+      res.status(400).json({ message: error.message || 'No se pudo eliminar el respaldo' })
+    }
+  },
+
+  async restoreBackup(req: AuthRequest, res: Response) {
+    try {
+      if (!configuracionController.ensureAdmin(req, res)) {
+        return
+      }
+
+      const { confirmacion } = req.body || {}
+      if (confirmacion !== 'RESTAURAR') {
+        return res.status(400).json({
+          message: 'Confirmación inválida. Envía confirmacion="RESTAURAR".',
+        })
+      }
+
+      const fileName = req.params.fileName
+      await backupService.restoreBackup(fileName)
+
+      res.json({
+        message: 'Respaldo restaurado exitosamente. Recarga la aplicación para ver cambios.',
+      })
+    } catch (error: any) {
+      console.error('Error al restaurar respaldo:', error)
+      res.status(500).json({ message: error.message || 'Error al restaurar respaldo' })
     }
   },
 }

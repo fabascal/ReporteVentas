@@ -143,12 +143,12 @@ export const usuariosController = {
         passwordHash = await bcrypt.hash(password, 10)
       }
 
-      // Crear usuario usando role_id
+      // Crear usuario usando role_id (el código de rol se obtiene por JOIN con roles)
       const result = await pool.query(
-        `INSERT INTO users (email, password_hash, name, role_id, role) 
-         VALUES ($1, $2, $3, $4, $5) 
-         RETURNING id, email, name, role, created_at`,
-        [email, passwordHash, name, roleId, roleCodigo]
+        `INSERT INTO users (email, password_hash, name, role_id) 
+         VALUES ($1, $2, $3, $4) 
+         RETURNING id, email, name, role_id, created_at`,
+        [email, passwordHash, name, roleId]
       )
 
       const newUser = result.rows[0]
@@ -177,7 +177,7 @@ export const usuariosController = {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
-        role: newUser.role,
+        role: roleCodigo,
         createdAt: newUser.created_at,
       })
     } catch (error) {
@@ -230,11 +230,8 @@ export const usuariosController = {
           return res.status(400).json({ message: 'Rol inválido o inactivo' })
         }
         const roleId = roleResult.rows[0].id
-        const roleCodigo = roleResult.rows[0].codigo
         updates.push(`role_id = $${paramCount++}`)
         values.push(roleId)
-        updates.push(`role = $${paramCount++}`)
-        values.push(roleCodigo)
       }
 
       if (password !== undefined && password !== '') {
@@ -253,11 +250,22 @@ export const usuariosController = {
       const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`
       const result = await pool.query(query, values)
 
+      let roleCodigo = result.rows[0].role
+      if (result.rows[0].role_id) {
+        const roleActualResult = await pool.query(
+          'SELECT codigo FROM roles WHERE id = $1',
+          [result.rows[0].role_id]
+        )
+        if (roleActualResult.rows.length > 0) {
+          roleCodigo = roleActualResult.rows[0].codigo
+        }
+      }
+
       res.json({
         id: result.rows[0].id,
         email: result.rows[0].email,
         name: result.rows[0].name,
-        role: result.rows[0].role,
+        role: roleCodigo,
         updatedAt: result.rows[0].updated_at,
       })
     } catch (error) {
@@ -329,8 +337,14 @@ export const usuariosController = {
       const { id } = req.params
       const { zonas } = req.body
 
-      // Verificar que el usuario existe y obtener su rol
-      const userResult = await pool.query('SELECT id, role FROM users WHERE id = $1', [id])
+      // Verificar que el usuario existe y obtener su rol efectivo
+      const userResult = await pool.query(
+        `SELECT u.id, COALESCE(r.codigo, u.role) as role
+         FROM users u
+         LEFT JOIN roles r ON r.id = u.role_id
+         WHERE u.id = $1`,
+        [id]
+      )
       if (userResult.rows.length === 0) {
         return res.status(404).json({ message: 'Usuario no encontrado' })
       }
@@ -384,7 +398,7 @@ export const usuariosController = {
   async getZonas(req: AuthRequest, res: Response) {
     try {
       const result = await pool.query(
-        'SELECT id, nombre FROM zonas WHERE activa = true ORDER BY nombre'
+        'SELECT id, nombre, orden_reporte FROM zonas WHERE activa = true ORDER BY COALESCE(orden_reporte, 99), nombre'
       )
       res.json(result.rows)
     } catch (error) {

@@ -8,6 +8,7 @@ import {
 } from '../services/cierreMensualService';
 import { CierreRequest } from '../types/cierreMensual';
 import { formatFechaHora } from '../utils/dateUtils';
+import { sileo } from 'sileo';
 
 interface CierreMensualModalProps {
   isOpen: boolean;
@@ -55,11 +56,11 @@ export const CierreMensualModal: React.FC<CierreMensualModalProps> = ({
       queryClient.invalidateQueries({ queryKey: ['cierre-estado'] });
       queryClient.invalidateQueries({ queryKey: ['cierre-validacion'] });
       queryClient.invalidateQueries({ queryKey: ['cierres-zona'] });
-      alert('Período cerrado exitosamente');
+      sileo.success({ title: 'Período cerrado exitosamente' });
       onClose();
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error || 'Error al cerrar el período');
+      sileo.error({ title: error.response?.data?.error || 'Error al cerrar el período' });
     },
   });
 
@@ -70,17 +71,17 @@ export const CierreMensualModal: React.FC<CierreMensualModalProps> = ({
       queryClient.invalidateQueries({ queryKey: ['cierre-estado'] });
       queryClient.invalidateQueries({ queryKey: ['cierre-validacion'] });
       queryClient.invalidateQueries({ queryKey: ['cierres-zona'] });
-      alert('Período reabierto exitosamente');
+      sileo.success({ title: 'Período reabierto exitosamente' });
       onClose();
     },
     onError: (error: any) => {
-      alert(error.response?.data?.error || 'Error al reabrir el período');
+      sileo.error({ title: error.response?.data?.error || 'Error al reabrir el período' });
     },
   });
 
   const handleCerrar = () => {
     if (!validacion?.puede_cerrar) {
-      alert('No se puede cerrar el período. Verifica que todas las estaciones estén completas.');
+      sileo.warning({ title: 'No se puede cerrar el período. Verifica que todas las estaciones estén completas.' });
       return;
     }
 

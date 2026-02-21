@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { User, Role } from '../types/auth'
+import { User } from '../types/auth'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -30,7 +30,7 @@ export interface CreateUsuarioData {
   email: string
   password?: string
   name: string
-  role: Role
+  role: string
   estaciones?: string[]
   zonas?: string[]
 }
@@ -39,7 +39,7 @@ export interface UpdateUsuarioData {
   email?: string
   password?: string
   name?: string
-  role?: Role
+  role?: string
 }
 
 export interface Zona {

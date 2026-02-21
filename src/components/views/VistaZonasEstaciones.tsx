@@ -12,6 +12,7 @@ import {
   CreateEstacionData,
   UpdateEstacionData,
 } from '../../services/zonasEstacionesService'
+import { sileo } from 'sileo'
 
 export default function VistaZonasEstaciones() {
   const queryClient = useQueryClient()
@@ -22,7 +23,6 @@ export default function VistaZonasEstaciones() {
   const [showEstacionModal, setShowEstacionModal] = useState(false)
   const [selectedZona, setSelectedZona] = useState<Zona | null>(null)
   const [selectedEstacion, setSelectedEstacion] = useState<Estacion | null>(null)
-  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   
   // Función para navegar a página de detalle de zona
   const handleVerEstaciones = (zona: Zona) => {
@@ -46,12 +46,10 @@ export default function VistaZonasEstaciones() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['zonas'] })
       setShowZonaModal(false)
-      setSaveMessage({ type: 'success', text: 'Zona creada exitosamente' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.success({ title: 'Zona creada exitosamente' })
     },
     onError: () => {
-      setSaveMessage({ type: 'error', text: 'Error al crear la zona' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.error({ title: 'Error al crear la zona' })
     },
   })
 
@@ -63,12 +61,10 @@ export default function VistaZonasEstaciones() {
       queryClient.invalidateQueries({ queryKey: ['estaciones'] })
       setShowZonaModal(false)
       setSelectedZona(null)
-      setSaveMessage({ type: 'success', text: 'Zona actualizada exitosamente' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.success({ title: 'Zona actualizada exitosamente' })
     },
     onError: () => {
-      setSaveMessage({ type: 'error', text: 'Error al actualizar la zona' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.error({ title: 'Error al actualizar la zona' })
     },
   })
 
@@ -77,15 +73,10 @@ export default function VistaZonasEstaciones() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['zonas'] })
       queryClient.invalidateQueries({ queryKey: ['estaciones'] })
-      setSaveMessage({ type: 'success', text: 'Zona eliminada exitosamente' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.success({ title: 'Zona eliminada exitosamente' })
     },
     onError: (error: any) => {
-      setSaveMessage({
-        type: 'error',
-        text: error.response?.data?.message || 'Error al eliminar la zona',
-      })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.error({ title: error.response?.data?.message || 'Error al eliminar la zona' })
     },
   })
 
@@ -96,29 +87,26 @@ export default function VistaZonasEstaciones() {
       queryClient.invalidateQueries({ queryKey: ['estaciones'] })
       queryClient.invalidateQueries({ queryKey: ['zonas'] })
       setShowEstacionModal(false)
-      setSaveMessage({ type: 'success', text: 'Estación creada exitosamente' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.success({ title: 'Estación creada exitosamente' })
     },
     onError: () => {
-      setSaveMessage({ type: 'error', text: 'Error al crear la estación' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.error({ title: 'Error al crear la estación' })
     },
   })
 
   const updateEstacionMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateEstacionData }) =>
       zonasEstacionesService.updateEstacion(id, data),
-    onSuccess: () => {
+    onSuccess: (_response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['estaciones'] })
       queryClient.invalidateQueries({ queryKey: ['zonas'] })
       setShowEstacionModal(false)
       setSelectedEstacion(null)
-      setSaveMessage({ type: 'success', text: 'Estación actualizada exitosamente' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      const nombre = variables?.data?.nombre || 'la estación'
+      sileo.success({ title: `Se actualizó ${nombre} correctamente` })
     },
     onError: () => {
-      setSaveMessage({ type: 'error', text: 'Error al actualizar la estación' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.error({ title: 'Error al actualizar la estación' })
     },
   })
 
@@ -127,15 +115,10 @@ export default function VistaZonasEstaciones() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['estaciones'] })
       queryClient.invalidateQueries({ queryKey: ['zonas'] })
-      setSaveMessage({ type: 'success', text: 'Estación eliminada exitosamente' })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.success({ title: 'Estación eliminada exitosamente' })
     },
     onError: (error: any) => {
-      setSaveMessage({
-        type: 'error',
-        text: error.response?.data?.message || 'Error al eliminar la estación',
-      })
-      setTimeout(() => setSaveMessage(null), 3000)
+      sileo.error({ title: error.response?.data?.message || 'Error al eliminar la estación' })
     },
   })
 
@@ -188,24 +171,6 @@ export default function VistaZonasEstaciones() {
           </button>
         </div>
       </div>
-
-      {/* Success/Error Message */}
-      {saveMessage && (
-        <div
-          className={`p-4 rounded-lg border ${
-            saveMessage.type === 'success'
-              ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-800 text-green-700 dark:text-green-400'
-              : 'bg-red-50 dark:bg-red-900/20 border-red-400 dark:border-red-800 text-red-700 dark:text-red-400'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined">
-              {saveMessage.type === 'success' ? 'check_circle' : 'error'}
-            </span>
-            <p className="font-medium">{saveMessage.text}</p>
-          </div>
-        </div>
-      )}
 
       {/* Zonas como Cards */}
       {estacionesPorZona.length === 0 ? (

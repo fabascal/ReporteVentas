@@ -20,7 +20,8 @@ import AdminLogs from './pages/AdminLogs'
 import CorreccionReporte from './pages/CorreccionReporte'
 import ReporteRevisionMensual from './pages/ReporteRevisionMensual'
 import { Role } from './types/auth'
-import { Toaster } from 'react-hot-toast'
+import { Toaster } from 'sileo'
+import 'sileo/styles.css'
 
 function App() {
   return (

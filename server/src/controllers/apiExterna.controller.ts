@@ -3,6 +3,23 @@ import { AuthRequest } from '../middleware/auth.middleware.js'
 import { apiExternaService } from '../services/apiExterna.service.js'
 import { pool } from '../config/database.js'
 
+async function estaPeriodoOperativoCerrado(zonaId: string, fecha: string): Promise<boolean> {
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM zonas_periodos_cierre
+    WHERE zona_id = $1
+      AND anio = EXTRACT(YEAR FROM $2::date)::int
+      AND mes = EXTRACT(MONTH FROM $2::date)::int
+      AND esta_cerrado = true
+    LIMIT 1
+    `,
+    [zonaId, fecha]
+  )
+
+  return result.rows.length > 0
+}
+
 export const apiExternaController = {
   async sincronizarReportes(req: AuthRequest, res: Response) {
     try {
@@ -125,7 +142,7 @@ export const apiExternaController = {
 
       // Verificar que la estación existe
       const estacionResult = await pool.query(
-        'SELECT id, nombre, identificador_externo FROM estaciones WHERE id = $1',
+        'SELECT id, nombre, identificador_externo, zona_id FROM estaciones WHERE id = $1',
         [estacionId]
       )
 
@@ -184,6 +201,18 @@ export const apiExternaController = {
         try {
           console.log(`\nProcesando fecha: ${fechaStr}`)
 
+          const periodoOperativoCerrado = await estaPeriodoOperativoCerrado(estacion.zona_id, fechaStr)
+          if (periodoOperativoCerrado) {
+            console.log(`  ⛔ Período operativo cerrado. No se reprocesa este día.`)
+            detalles.push({
+              fecha: fechaStr,
+              estado: 'bloqueado_cierre_operativo',
+              mensaje: 'Período operativo cerrado para la zona',
+            })
+            errores++
+            continue
+          }
+
           // Obtener datos de la API para este día específico
           const datos = await apiExternaService.obtenerDatosReportes(token, fechaStr, fechaStr)
           
@@ -220,7 +249,7 @@ export const apiExternaController = {
 
           // Verificar si ya existe un reporte para esta fecha
           const reporteExistente = await pool.query(
-            'SELECT id FROM reportes WHERE estacion_id = $1 AND fecha::date = $2::date',
+            'SELECT id, aceites FROM reportes WHERE estacion_id = $1 AND fecha::date = $2::date',
             [estacionId, fechaStr]
           )
 
@@ -258,7 +287,7 @@ export const apiExternaController = {
             })
           }
 
-          // Preparar productos (preservando valores de inventario si existen)
+          // Preparar productos (usando directamente los valores de la API)
           const productosParaGuardar = {
             premium: {
               precio: datosReporte.premium.precio,
@@ -269,7 +298,14 @@ export const apiExternaController = {
               mermaVolumen: datosReporte.premium.mermaVolumen || 0,
               mermaImporte: datosReporte.premium.mermaImporte || 0,
               mermaPorcentaje: datosReporte.premium.mermaPorcentaje || 0,
-              ...inventarioExistente.premium,
+              iib: datosReporte.premium.iib || 0,
+              compras: datosReporte.premium.compras || 0,
+              cct: datosReporte.premium.cct || 0,
+              vDsc: inventarioExistente.premium.vDsc,
+              dc: inventarioExistente.premium.dc,
+              difVDsc: inventarioExistente.premium.difVDsc,
+              if: inventarioExistente.premium.if,
+              iffb: datosReporte.premium.iffb || 0,
             },
             magna: {
               precio: datosReporte.magna.precio,
@@ -280,7 +316,14 @@ export const apiExternaController = {
               mermaVolumen: datosReporte.magna.mermaVolumen || 0,
               mermaImporte: datosReporte.magna.mermaImporte || 0,
               mermaPorcentaje: datosReporte.magna.mermaPorcentaje || 0,
-              ...inventarioExistente.magna,
+              iib: datosReporte.magna.iib || 0,
+              compras: datosReporte.magna.compras || 0,
+              cct: datosReporte.magna.cct || 0,
+              vDsc: inventarioExistente.magna.vDsc,
+              dc: inventarioExistente.magna.dc,
+              difVDsc: inventarioExistente.magna.difVDsc,
+              if: inventarioExistente.magna.if,
+              iffb: datosReporte.magna.iffb || 0,
             },
             diesel: {
               precio: datosReporte.diesel.precio,
@@ -291,7 +334,14 @@ export const apiExternaController = {
               mermaVolumen: datosReporte.diesel.mermaVolumen || 0,
               mermaImporte: datosReporte.diesel.mermaImporte || 0,
               mermaPorcentaje: datosReporte.diesel.mermaPorcentaje || 0,
-              ...inventarioExistente.diesel,
+              iib: datosReporte.diesel.iib || 0,
+              compras: datosReporte.diesel.compras || 0,
+              cct: datosReporte.diesel.cct || 0,
+              vDsc: inventarioExistente.diesel.vDsc,
+              dc: inventarioExistente.diesel.dc,
+              difVDsc: inventarioExistente.diesel.difVDsc,
+              if: inventarioExistente.diesel.if,
+              iffb: datosReporte.diesel.iffb || 0,
             },
           }
 
@@ -363,9 +413,12 @@ export const apiExternaController = {
 
           if (reporteExistente.rows.length > 0) {
             // Actualizar reporte existente
+            const aceitesParaGuardar = datosReporte.aceitesDetectado
+              ? (datosReporte.aceites || 0)
+              : (reporteExistente.rows[0].aceites || 0)
             await pool.query(
-              `UPDATE reportes SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-              [reporteExistente.rows[0].id]
+              `UPDATE reportes SET aceites = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+              [reporteExistente.rows[0].id, aceitesParaGuardar]
             )
             await guardarProductosReporte(reporteExistente.rows[0].id, productosParaGuardar, true)
             actualizados++
@@ -380,9 +433,9 @@ export const apiExternaController = {
           } else {
             // Crear nuevo reporte
             const result = await pool.query(
-              `INSERT INTO reportes (estacion_id, fecha, estado, creado_por)
-               VALUES ($1, $2::date, $3, $4) RETURNING id`,
-              [estacionId, fechaStr, 'Pendiente', req.user.id]
+              `INSERT INTO reportes (estacion_id, fecha, aceites, estado, creado_por)
+               VALUES ($1, $2::date, $3, $4, $5) RETURNING id`,
+              [estacionId, fechaStr, datosReporte.aceites || 0, 'Pendiente', req.user.id]
             )
             await guardarProductosReporte(result.rows[0].id, productosParaGuardar, false)
             creados++

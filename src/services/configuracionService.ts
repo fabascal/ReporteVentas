@@ -22,6 +22,23 @@ export interface ConfiguracionAPI {
   apiContrasena: string
 }
 
+export interface BackupSettings {
+  enabled: boolean
+  frequency: 'diario' | 'semanal' | 'mensual'
+  time: string
+  retentionDays: number
+  weeklyDay: number
+  monthlyDay: number
+  lastAutoRunAt: string | null
+}
+
+export interface BackupItem {
+  fileName: string
+  sizeBytes: number
+  createdAt: string
+  source: 'manual' | 'automatico' | 'desconocido'
+}
+
 export const configuracionService = {
   async getConfiguracionAPI(): Promise<ConfiguracionAPI> {
     const response = await api.get<ConfiguracionAPI>('/configuracion/api')
@@ -30,6 +47,59 @@ export const configuracionService = {
 
   async updateConfiguracionAPI(data: ConfiguracionAPI): Promise<void> {
     await api.put('/configuracion/api', data)
+  },
+
+  async getBackupSettings(): Promise<BackupSettings> {
+    const response = await api.get<BackupSettings>('/configuracion/backups/settings')
+    return response.data
+  },
+
+  async updateBackupSettings(data: Partial<BackupSettings>): Promise<{
+    message: string
+    settings: BackupSettings
+  }> {
+    const response = await api.put('/configuracion/backups/settings', data)
+    return response.data
+  },
+
+  async listBackups(): Promise<BackupItem[]> {
+    const response = await api.get<{ backups: BackupItem[] }>('/configuracion/backups')
+    return response.data.backups || []
+  },
+
+  async createManualBackup(): Promise<{ message: string }> {
+    const response = await api.post('/configuracion/backups/manual')
+    return response.data
+  },
+
+  async downloadBackup(fileName: string): Promise<Blob> {
+    const response = await api.get(`/configuracion/backups/${encodeURIComponent(fileName)}/download`, {
+      responseType: 'blob',
+    })
+    return response.data
+  },
+
+  async deleteBackup(fileName: string): Promise<{ message: string }> {
+    const response = await api.delete(`/configuracion/backups/${encodeURIComponent(fileName)}`)
+    return response.data
+  },
+
+  async restoreBackup(fileName: string): Promise<{ message: string }> {
+    const url = `/configuracion/backups/${encodeURIComponent(fileName)}/restore`
+    const payload = { confirmacion: 'RESTAURAR' }
+
+    try {
+      const response = await api.post(url, payload)
+      return response.data
+    } catch (error: any) {
+      // Si el backend se está reiniciando, dar un segundo intento corto.
+      if (error?.code === 'ERR_NETWORK') {
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        const retry = await api.post(url, payload)
+        return retry.data
+      }
+      throw error
+    }
   },
 
   async sincronizarReportes(fechaInicio: string, fechaFin: string): Promise<{

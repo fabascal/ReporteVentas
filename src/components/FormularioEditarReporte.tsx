@@ -153,6 +153,9 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
       // Limpiar todos los valores temporales y campos enfocados para forzar actualización visual
       setTempValues({})
       setFocusedFields(new Set())
+      if (datos.aceites !== undefined) {
+        setValue('aceites', datos.aceites, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+      }
 
       // Actualizar campos Premium
       if (datos.premium) {
@@ -160,6 +163,9 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
         console.log('Valores antes de setValue - PremiumPrecio:', watch('premiumPrecio'), 'PremiumLitros:', watch('premiumLitros'))
         setValue('premiumPrecio', datos.premium.precio, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
         setValue('premiumLitros', datos.premium.litros, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('premiumIib', datos.premium.iib, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('premiumCompras', datos.premium.compras, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('premiumIffb', datos.premium.iffb, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
         console.log('Valores después de setValue - PremiumPrecio:', watch('premiumPrecio'), 'PremiumLitros:', watch('premiumLitros'))
         setMermaData((prev) => ({
           ...prev,
@@ -176,6 +182,9 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
         console.log('Actualizando Magna:', datos.magna)
         setValue('magnaPrecio', datos.magna.precio, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
         setValue('magnaLitros', datos.magna.litros, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('magnaIib', datos.magna.iib, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('magnaCompras', datos.magna.compras, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('magnaIffb', datos.magna.iffb, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
         setMermaData((prev) => ({
           ...prev,
           magna: {
@@ -191,6 +200,9 @@ export default function FormularioEditarReporte({ reporte, onSuccess, onCancel }
         console.log('Actualizando Diesel:', datos.diesel)
         setValue('dieselPrecio', datos.diesel.precio, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
         setValue('dieselLitros', datos.diesel.litros, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('dieselIib', datos.diesel.iib, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('dieselCompras', datos.diesel.compras, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
+        setValue('dieselIffb', datos.diesel.iffb, { shouldValidate: false, shouldDirty: true, shouldTouch: true })
         setMermaData((prev) => ({
           ...prev,
           diesel: {

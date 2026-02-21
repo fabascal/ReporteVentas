@@ -10,14 +10,15 @@ export const zonasController = {
         `SELECT 
           z.id,
           z.nombre,
+          z.orden_reporte,
           z.activa,
           z.created_at,
           COUNT(e.id) as total_estaciones,
           COUNT(CASE WHEN e.activa = true THEN 1 END) as estaciones_activas
         FROM zonas z
         LEFT JOIN estaciones e ON z.id = e.zona_id
-        GROUP BY z.id, z.nombre, z.activa, z.created_at
-        ORDER BY z.nombre`
+        GROUP BY z.id, z.nombre, z.orden_reporte, z.activa, z.created_at
+        ORDER BY COALESCE(z.orden_reporte, 99) ASC, z.nombre ASC`
       )
 
       res.json(result.rows)
@@ -55,15 +56,24 @@ export const zonasController = {
   // Crear nueva zona
   async createZona(req: AuthRequest, res: Response) {
     try {
-      const { nombre } = req.body
+      const { nombre, activa, orden_reporte } = req.body
 
       if (!nombre) {
         return res.status(400).json({ message: 'El nombre es requerido' })
       }
 
+      const ordenReporte =
+        orden_reporte !== undefined && orden_reporte !== null && orden_reporte !== ''
+          ? parseInt(String(orden_reporte), 10)
+          : 99
+
+      if (Number.isNaN(ordenReporte) || ordenReporte < 1) {
+        return res.status(400).json({ message: 'El orden de reporte debe ser un número mayor o igual a 1' })
+      }
+
       const result = await pool.query(
-        'INSERT INTO zonas (nombre) VALUES ($1) RETURNING *',
-        [nombre]
+        'INSERT INTO zonas (nombre, activa, orden_reporte) VALUES ($1, $2, $3) RETURNING *',
+        [nombre, activa !== undefined ? Boolean(activa) : true, ordenReporte]
       )
 
       res.status(201).json(result.rows[0])
@@ -77,15 +87,24 @@ export const zonasController = {
   async updateZona(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params
-      const { nombre, activa } = req.body
+      const { nombre, activa, orden_reporte } = req.body
 
       if (!nombre) {
         return res.status(400).json({ message: 'El nombre es requerido' })
       }
 
+      const ordenReporte =
+        orden_reporte !== undefined && orden_reporte !== null && orden_reporte !== ''
+          ? parseInt(String(orden_reporte), 10)
+          : 99
+
+      if (Number.isNaN(ordenReporte) || ordenReporte < 1) {
+        return res.status(400).json({ message: 'El orden de reporte debe ser un número mayor o igual a 1' })
+      }
+
       const result = await pool.query(
-        'UPDATE zonas SET nombre = $1, activa = $2 WHERE id = $3 RETURNING *',
-        [nombre, activa !== undefined ? activa : true, id]
+        'UPDATE zonas SET nombre = $1, activa = $2, orden_reporte = $3 WHERE id = $4 RETURNING *',
+        [nombre, activa !== undefined ? activa : true, ordenReporte, id]
       )
 
       if (result.rows.length === 0) {

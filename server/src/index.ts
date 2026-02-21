@@ -16,6 +16,7 @@ import ejerciciosRoutes from './routes/ejercicios.routes.js'
 import { reportesRoutes } from './routes/reportes.routes.js'
 import externalRoutes from './routes/external.routes.js'
 import { importExcelRoutes } from './routes/importExcel.routes.js'
+import { backupService } from './services/backup.service.js'
 
 dotenv.config()
 
@@ -51,6 +52,7 @@ app.get('/health', (req, res) => {
 const startServer = async () => {
   try {
     await initDatabase()
+    await backupService.startScheduler()
     app.listen(port, () => {
       console.log(`Server running on port ${port}`)
     })

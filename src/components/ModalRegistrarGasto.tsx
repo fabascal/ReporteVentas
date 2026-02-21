@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { sileo } from 'sileo';
 import financieroService from '../services/financieroService';
-import toast from 'react-hot-toast';
 
 interface ModalRegistrarGastoProps {
   estaciones?: Array<{ id: string; nombre: string }>;
@@ -71,7 +71,7 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
   const registrarMutation = useMutation({
     mutationFn: (data: any) => financieroService.registrarGasto(data),
     onSuccess: () => {
-      toast.success('Gasto registrado exitosamente');
+      sileo.success({ title: 'Gasto registrado exitosamente' });
       // Invalidar todas las queries relacionadas con el dashboard y resguardo
       queryClient.invalidateQueries({ queryKey: ['dashboard-financiero'] });
       queryClient.invalidateQueries({ queryKey: ['gastos'] });
@@ -82,7 +82,7 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.error || 'Error al registrar el gasto';
-      toast.error(errorMessage);
+      sileo.error({ title: errorMessage });
     },
   });
 
@@ -100,8 +100,12 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
     }
     if (!formData.monto || parseFloat(formData.monto) <= 0) {
       newErrors.monto = 'Ingrese un monto válido mayor a cero';
-    } else if (limiteData && parseFloat(formData.monto) > limiteData.disponible) {
-      newErrors.monto = `El monto excede el límite disponible ($${limiteData.disponible.toFixed(2)})`;
+    } else if (limiteData) {
+      const montoIngresado = parseFloat(formData.monto);
+      const tolerancia = 0.000001;
+      if (montoIngresado - limiteData.disponible > tolerancia) {
+        newErrors.monto = `El monto excede el disponible real para gastar ($${limiteData.disponible.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`;
+      }
     }
     if (!formData.concepto.trim()) {
       newErrors.concepto = 'Ingrese el concepto del gasto';
@@ -311,7 +315,6 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
                 type="number"
                 step="0.01"
                 min="0"
-                max={limiteData?.disponible || undefined}
                 value={formData.monto}
                 onChange={(e) => handleChange('monto', e.target.value)}
                 placeholder="0.00"
@@ -341,19 +344,31 @@ export default function ModalRegistrarGasto({ estaciones, zona, onClose, periodo
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-[#617589] dark:text-slate-400">Límite mensual:</span>
                   <span className="font-semibold text-[#111418] dark:text-white">
-                    ${limiteData.limite_gastos.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                    ${limiteData.limite_gastos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm mt-1">
                   <span className="text-[#617589] dark:text-slate-400">Gastado:</span>
                   <span className="text-orange-600 dark:text-orange-400 font-medium">
-                    ${limiteData.gastos_acumulados.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                    ${limiteData.gastos_acumulados.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm mt-1 pt-2 border-t border-blue-200 dark:border-slate-700">
-                  <span className="text-[#617589] dark:text-slate-400 font-semibold">Disponible:</span>
+                  <span className="text-[#617589] dark:text-slate-400">Disponible por límite:</span>
+                  <span className="font-semibold text-[#111418] dark:text-white">
+                    ${limiteData.disponible_por_limite.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1">
+                  <span className="text-[#617589] dark:text-slate-400">Disponible por resguardo:</span>
+                  <span className="font-semibold text-[#111418] dark:text-white">
+                    ${limiteData.disponible_por_resguardo.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-1 pt-2 border-t border-blue-200 dark:border-slate-700">
+                  <span className="text-[#617589] dark:text-slate-400 font-semibold">Disponible real para gastar:</span>
                   <span className={`font-bold ${limiteData.disponible > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    ${limiteData.disponible.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                    ${limiteData.disponible.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 {limiteData.disponible <= 0 && (

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { sileo } from 'sileo';
 import financieroService from '../services/financieroService';
-import toast from 'react-hot-toast';
 
 interface EstacionFinanciera {
   estacion_id: string;
@@ -34,14 +34,12 @@ export default function ModalLiquidarPeriodo({
   const [observaciones, setObservaciones] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
 
-  // Validar estaciones
+  // Estaciones con diferencia al momento del cierre (solo informativo)
   const estacionesConSaldo = estaciones.filter(e => {
     const merma = parseFloat(e.merma_generada.toString());
     const saldo = parseFloat(e.saldo_resguardo.toString());
     return merma > 0 && saldo !== 0;
   });
-
-  const puedenLiquidar = estacionesConSaldo.length === 0;
 
   const liquidarMutation = useMutation({
     mutationFn: () => financieroService.cerrarPeriodoContable(
@@ -50,7 +48,7 @@ export default function ModalLiquidarPeriodo({
       observaciones || undefined
     ),
     onSuccess: () => {
-      toast.success('Período liquidado exitosamente');
+      sileo.success({ title: 'Período liquidado exitosamente' });
       queryClient.invalidateQueries({ queryKey: ['dashboard-financiero'] });
       onClose();
     },
@@ -60,32 +58,16 @@ export default function ModalLiquidarPeriodo({
       const estacionesPendientes = error?.response?.data?.estaciones_pendientes;
       
       if (estacionesPendientes) {
-        toast.error(
-          <div>
-            <p className="font-bold">{errorMessage}</p>
-            <ul className="mt-2 text-sm">
-              {estacionesPendientes.map((e: any) => (
-                <li key={e.nombre}>
-                  {e.nombre}: ${e.saldo.toLocaleString('es-MX', { minimumFractionDigits: 4 })}
-                </li>
-              ))}
-            </ul>
-          </div>,
-          { duration: 6000 }
-        );
+        sileo.error({ title: errorMessage, duration: 6000 });
       } else if (detalle) {
-        toast.error(`${errorMessage}\n${detalle}`);
+        sileo.error({ title: errorMessage, description: detalle });
       } else {
-        toast.error(errorMessage);
+        sileo.error({ title: errorMessage });
       }
     },
   });
 
   const handleLiquidar = () => {
-    if (!puedenLiquidar) {
-      toast.error('No se puede liquidar. Hay estaciones con saldo pendiente.');
-      return;
-    }
     setShowConfirmation(true);
   };
 
@@ -150,41 +132,26 @@ export default function ModalLiquidarPeriodo({
           </div>
 
           {/* Estado de Liquidación */}
-          {puedenLiquidar ? (
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
-              <div className="flex items-start">
-                <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-3xl mr-3">
-                  check_circle
-                </span>
-                <div>
-                  <h4 className="font-bold text-green-800 dark:text-green-300">Listo para Liquidar</h4>
-                  <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                    Todas las estaciones con actividad están en saldo $0.00. Puedes proceder con la liquidación del período.
-                  </p>
-                </div>
+          <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+            <div className="flex items-start">
+              <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-3xl mr-3">
+                check_circle
+              </span>
+              <div>
+                <h4 className="font-bold text-green-800 dark:text-green-300">Listo para Liquidar</h4>
+                <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                  La liquidación cerrará el período y guardará el saldo/diferencia de cada estación y el total de la zona.
+                  No se bloquea por saldos pendientes.
+                </p>
               </div>
             </div>
-          ) : (
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
-              <div className="flex items-start">
-                <span className="material-symbols-outlined text-red-600 dark:text-red-400 text-3xl mr-3">
-                  error
-                </span>
-                <div>
-                  <h4 className="font-bold text-red-800 dark:text-red-300">No se puede Liquidar</h4>
-                  <p className="text-sm text-red-700 dark:text-red-400 mt-1">
-                    Hay {estacionesConSaldo.length} estación(es) con saldo pendiente. Deben estar en $0.00 para liquidar.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
 
-          {/* Listado de Estaciones Pendientes */}
+          {/* Listado de Estaciones con Diferencia */}
           {estacionesConSaldo.length > 0 && (
             <div>
               <h4 className="font-bold text-[#111418] dark:text-white mb-3">
-                Estaciones con Saldo Pendiente
+                Estaciones con Diferencia al Cierre
               </h4>
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {estacionesConSaldo.map(est => (
@@ -217,7 +184,6 @@ export default function ModalLiquidarPeriodo({
                        bg-white dark:bg-[#0d1b2a] text-[#111418] dark:text-white
                        focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               placeholder="Notas adicionales sobre esta liquidación..."
-              disabled={!puedenLiquidar}
             />
           </div>
 
@@ -252,7 +218,7 @@ export default function ModalLiquidarPeriodo({
           <button
             type="button"
             onClick={handleLiquidar}
-            disabled={!puedenLiquidar || liquidarMutation.isPending}
+            disabled={liquidarMutation.isPending}
             className="px-6 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 
                      dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium 
                      transition-colors disabled:opacity-50 disabled:cursor-not-allowed

@@ -1,7 +1,7 @@
 import express from 'express'
 import { reportesController } from '../controllers/reportes.controller.js'
 import { apiExternaController } from '../controllers/apiExterna.controller.js'
-import { authenticateToken, requireRole } from '../middleware/auth.middleware.js'
+import { authenticateToken, requireMenuAccess, requireRole } from '../middleware/auth.middleware.js'
 import { Role } from '../types/auth.js'
 
 const router = express.Router()
@@ -11,6 +11,34 @@ router.use(authenticateToken)
 
 // Obtener todos los reportes (según el rol del usuario)
 router.get('/', reportesController.getReportes)
+
+// Reporte ER por zona y período
+router.get(
+  '/er/zona',
+  requireMenuAccess('/director/reportes'),
+  reportesController.getReporteERPorZona
+)
+
+// Reporte R por zona (todas las zonas) y período
+router.get(
+  '/r/general',
+  requireMenuAccess('/director/reportes'),
+  reportesController.getReporteRGeneral
+)
+
+// Reporte de conciliación mensual por zona y período
+router.get(
+  '/conciliacion-mensual',
+  requireMenuAccess('/director/reportes'),
+  reportesController.getReporteConciliacionMensual
+)
+
+// Reporte ejecutivo de liquidaciones por zona/estación
+router.get(
+  '/liquidaciones',
+  requireMenuAccess('/director/liquidaciones'),
+  reportesController.getReporteLiquidaciones
+)
 
 // Obtener un reporte por ID
 router.get('/:id', reportesController.getReporteById)
@@ -74,17 +102,17 @@ router.post(
 // Obtener auditoría de un reporte
 router.get('/:id/auditoria', reportesController.getAuditoriaReporte)
 
-// Obtener todos los logs de reportes (solo Administrador)
+// Obtener todos los logs de reportes (Administrador y Dirección)
 router.get(
   '/logs/todos',
-  requireRole(Role.Administrador),
+  requireMenuAccess('/admin/logs'),
   reportesController.getAllLogs
 )
 
-// Obtener logs del sistema (gastos, entregas, cierres) (solo Administrador)
+// Obtener logs del sistema (gastos, entregas, cierres) (Administrador y Dirección)
 router.get(
   '/logs/sistema',
-  requireRole(Role.Administrador),
+  requireMenuAccess('/admin/logs'),
   reportesController.getLogsSistema
 )
 

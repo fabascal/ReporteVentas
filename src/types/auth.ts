@@ -3,6 +3,7 @@ export enum Role {
   GerenteEstacion = 'GerenteEstacion',
   GerenteZona = 'GerenteZona',
   Direccion = 'Direccion',
+  DirectorOperaciones = 'DirectorOperaciones',
 }
 
 export interface User {

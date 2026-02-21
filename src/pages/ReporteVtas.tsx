@@ -79,7 +79,20 @@ export default function ReporteVtas() {
 
   const formatNumber = (value: number | undefined): string => {
     if (value === undefined || value === null) return '0.00'
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value)
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  }
+
+  const calcularDC = (producto: any): number => {
+    const compras = producto?.compras || 0
+    const cct = producto?.cct || 0
+    return cct - compras
+  }
+
+  const calcularDifVDsc = (producto: any): number => {
+    const compras = producto?.compras || 0
+    const cct = producto?.cct || 0
+    const vDsc = producto?.vDsc || 0
+    return (cct + vDsc) - compras
   }
 
   // Calcular totales
@@ -87,14 +100,16 @@ export default function ReporteVtas() {
     return reportes.reduce((acc, reporte) => {
       const producto = reporte[productoSeleccionado]
       if (producto) {
+        const dcCalculado = calcularDC(producto)
+        const difVDscCalculado = calcularDifVDsc(producto)
         acc.litros += producto.litros || 0
         acc.mermaVolumen += producto.mermaVolumen || 0
         acc.iib += producto.iib || 0
         acc.compras += producto.compras || 0
         acc.cct += producto.cct || 0
         acc.vDsc += producto.vDsc || 0
-        acc.dc += producto.dc || 0
-        acc.difVDsc += producto.difVDsc || 0
+        acc.dc += dcCalculado
+        acc.difVDsc += difVDscCalculado
         acc.v += (producto.litros || 0) - (producto.mermaVolumen || 0)
         acc.iffb += producto.iffb || 0
         acc.eficienciaReal += producto.eficienciaReal || 0
@@ -288,6 +303,8 @@ export default function ReporteVtas() {
                     {reportes.map((reporte) => {
                       const producto = reporte[productoSeleccionado]
                       if (!producto) return null
+                      const dcCalculado = calcularDC(producto)
+                      const difVDscCalculado = calcularDifVDsc(producto)
 
                       return (
                         <tr key={reporte.id} className="hover:bg-gray-50 dark:hover:bg-[#1a2632] transition-colors">
@@ -301,8 +318,8 @@ export default function ReporteVtas() {
                           <td className="px-3 py-2 text-right">{formatNumber(producto.compras)}</td>
                           <td className="px-3 py-2 text-right">{formatNumber(producto.cct)}</td>
                           <td className="px-3 py-2 text-right">{formatNumber(producto.vDsc)}</td>
-                          <td className={`px-3 py-2 text-right ${(producto.dc || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.dc)}</td>
-                          <td className={`px-3 py-2 text-right ${(producto.difVDsc || 0) < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(producto.difVDsc)}</td>
+                          <td className={`px-3 py-2 text-right ${dcCalculado < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(dcCalculado)}</td>
+                          <td className={`px-3 py-2 text-right ${difVDscCalculado < 0 ? 'text-red-600 font-semibold' : ''}`}>{formatNumber(difVDscCalculado)}</td>
                           <td className="px-3 py-2 text-right">{formatNumber((producto.litros || 0) - (producto.mermaVolumen || 0))}</td>
                           <td className="px-3 py-2 text-right">{formatNumber(producto.if)}</td>
                           <td className="px-3 py-2 text-right">{formatNumber(producto.iffb)}</td>

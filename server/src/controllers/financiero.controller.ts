@@ -18,6 +18,11 @@ interface AuthRequest extends Request {
  */
 export const getDashboardFinanciero = async (req: AuthRequest, res: Response) => {
   try {
+    // Evita respuestas antiguas en proxies/navegador para tablero financiero.
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+
     const usuario = req.user;
     
     if (!usuario) {
@@ -72,13 +77,84 @@ export const getDashboardFinanciero = async (req: AuthRequest, res: Response) =>
         return await getDashboardDirector(usuario, periodo, res);
       
       default:
-        return res.status(403).json({ error: 'Rol no autorizado' });
+        // Para roles nuevos, devolver la vista ejecutiva cuando tengan permiso de menú.
+        return await getDashboardDirector(usuario, periodo, res);
     }
   } catch (error) {
     console.error('[getDashboardFinanciero] Error:', error);
     res.status(500).json({ error: 'Error al obtener dashboard financiero' });
   }
 };
+
+async function obtenerSaldoInicialZona(zonaId: string, anio: number, mes: number): Promise<number> {
+  const anioAnterior = anio - (mes === 1 ? 1 : 0);
+  const mesAnterior = mes === 1 ? 12 : mes - 1;
+  const anioBase = anioAnterior - (mesAnterior === 1 ? 1 : 0);
+  const mesBase = mesAnterior === 1 ? 12 : mesAnterior - 1;
+
+  const saldoBaseResult = await pool.query(
+    `SELECT saldo_final
+     FROM liquidaciones_mensuales
+     WHERE zona_id = $1
+       AND estacion_id IS NULL
+       AND anio = $2
+       AND mes = $3
+       AND estado = 'cerrado'
+     ORDER BY fecha_cierre DESC
+     LIMIT 1`,
+    [zonaId, anioBase, mesBase]
+  );
+  const saldoBase = parseFloat(saldoBaseResult.rows[0]?.saldo_final || '0');
+
+  const fechaInicioAnterior = new Date(anioAnterior, mesAnterior - 1, 1);
+  const fechaFinAnterior = new Date(anioAnterior, mesAnterior, 0);
+
+  const movimientosResult = await pool.query(
+    `SELECT
+       COALESCE(
+         (
+           SELECT SUM(e.monto)
+           FROM entregas e
+           WHERE e.zona_id = $1
+             AND e.tipo_entrega = 'estacion_zona'
+             AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+             AND e.fecha >= $2
+             AND e.fecha <= $3
+         ),
+         0
+       ) AS entregas_recibidas,
+       COALESCE(
+         (
+           SELECT SUM(e.monto)
+           FROM entregas e
+           WHERE e.zona_origen_id = $1
+             AND e.tipo_entrega = 'zona_direccion'
+             AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+             AND e.fecha >= $2
+             AND e.fecha <= $3
+         ),
+         0
+       ) AS entregas_enviadas,
+       COALESCE(
+         (
+           SELECT SUM(g.monto)
+           FROM gastos g
+           WHERE g.zona_id = $1
+             AND g.tipo_gasto = 'zona'
+             AND g.fecha >= $2
+             AND g.fecha <= $3
+         ),
+         0
+       ) AS gastos_zona`,
+    [zonaId, fechaInicioAnterior, fechaFinAnterior]
+  );
+
+  const entregasRecibidas = parseFloat(movimientosResult.rows[0]?.entregas_recibidas || '0');
+  const entregasEnviadas = parseFloat(movimientosResult.rows[0]?.entregas_enviadas || '0');
+  const gastosZona = parseFloat(movimientosResult.rows[0]?.gastos_zona || '0');
+
+  return saldoBase + entregasRecibidas - entregasEnviadas - gastosZona;
+}
 
 /**
  * Dashboard para Gerente de Estación
@@ -128,6 +204,7 @@ async function getDashboardGerenteEstacion(usuario: any, periodo: any, res: Resp
            FROM entregas en 
            WHERE en.estacion_id = e.id 
            AND en.tipo_entrega = 'estacion_zona'
+           AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
            AND en.fecha >= $2 
            AND en.fecha <= $3), 
           0
@@ -147,6 +224,7 @@ async function getDashboardGerenteEstacion(usuario: any, periodo: any, res: Resp
            FROM entregas en 
            WHERE en.estacion_id = e.id 
            AND en.tipo_entrega = 'estacion_zona'
+           AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
            AND en.fecha >= $2 
            AND en.fecha <= $3), 
           0
@@ -227,6 +305,19 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
 
     const zona = zonaResult.rows[0];
 
+    const periodoContableResult = await pool.query(
+      `SELECT 1
+       FROM liquidaciones_mensuales
+       WHERE zona_id = $1
+         AND estacion_id IS NULL
+         AND anio = $2
+         AND mes = $3
+         AND estado = 'cerrado'
+       LIMIT 1`,
+      [zonaId, periodo.anio, periodo.mes]
+    );
+    const periodoContableLiquidado = periodoContableResult.rows.length > 0;
+
     console.log('[getDashboardGerenteZona] Buscando con parámetros:', {
       zonaId,
       fecha_inicio: periodo.fecha_inicio,
@@ -246,6 +337,7 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
            FROM entregas en 
            WHERE en.estacion_id = e.id 
            AND en.tipo_entrega = 'estacion_zona'
+           AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
            AND en.fecha >= $2 
            AND en.fecha <= $3), 
           0
@@ -265,6 +357,7 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
            FROM entregas en 
            WHERE en.estacion_id = e.id 
            AND en.tipo_entrega = 'estacion_zona'
+           AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
            AND en.fecha >= $2 
            AND en.fecha <= $3), 
           0
@@ -303,6 +396,7 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
       FROM entregas e
       WHERE e.zona_id = $1
         AND e.tipo_entrega = 'estacion_zona'
+        AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
         AND e.fecha >= $2
         AND e.fecha <= $3
     `, [zonaId, periodo.fecha_inicio, periodo.fecha_fin]);
@@ -315,6 +409,7 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
       FROM entregas e
       WHERE e.zona_origen_id = $1
         AND e.tipo_entrega = 'zona_direccion'
+        AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
         AND e.fecha >= $2
         AND e.fecha <= $3
     `, [zonaId, periodo.fecha_inicio, periodo.fecha_fin]);
@@ -333,31 +428,36 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
 
     const gastosZona = parseFloat(gastosZonaResult.rows[0]?.total || 0);
 
-    // Calcular resguardo de zona: Saldo anterior + Entregas recibidas - Entregas dirección - Gastos zona
-    const saldoInicial = 0; // TODO: Implementar saldo del mes anterior
+    // Arrastre de saldo: saldo final del mes anterior (liquidado) -> saldo inicial del mes actual.
+    const saldoInicial = await obtenerSaldoInicialZona(zonaId, periodo.anio, periodo.mes);
     const resguardoZona = saldoInicial + entregasRecibidas - entregasDireccion - gastosZona;
 
-    // Calcular estadísticas
-    // Una estación está liquidada solo si: tiene merma > 0, entregas > 0, y saldo = 0
-    const estacionesLiquidadas = estacionesResult.rows.filter(est => 
-      parseFloat(est.saldo_resguardo) === 0 && 
-      parseFloat(est.merma_generada) > 0 && 
-      parseFloat(est.entregas_realizadas) > 0
-    ).length;
-    
-    // Estaciones en proceso: tienen merma pero no han entregado nada
-    const estacionesProceso = estacionesResult.rows.filter(est => 
-      parseFloat(est.merma_generada) > 0 && 
-      parseFloat(est.entregas_realizadas) === 0
-    ).length;
-    
-    // Estaciones pendientes: han entregado pero aún tienen saldo
-    const estacionesPendientes = estacionesResult.rows.filter(est => 
-      parseFloat(est.saldo_resguardo) > 0 && 
-      parseFloat(est.entregas_realizadas) > 0
-    ).length;
-    
+    // Calcular estadísticas.
+    // Regla de negocio: si el periodo contable ya está liquidado, la estación debe verse liquidada
+    // aunque conserve diferencia/saldo.
     const totalEstaciones = estacionesResult.rows.length;
+    const estacionesLiquidadas = periodoContableLiquidado
+      ? totalEstaciones
+      : estacionesResult.rows.filter(est =>
+          parseFloat(est.saldo_resguardo) === 0 &&
+          parseFloat(est.merma_generada) > 0 &&
+          parseFloat(est.entregas_realizadas) > 0
+        ).length;
+
+    const estacionesProceso = periodoContableLiquidado
+      ? 0
+      : estacionesResult.rows.filter(est =>
+          parseFloat(est.merma_generada) > 0 &&
+          parseFloat(est.entregas_realizadas) === 0
+        ).length;
+
+    const estacionesPendientes = periodoContableLiquidado
+      ? 0
+      : estacionesResult.rows.filter(est =>
+          parseFloat(est.saldo_resguardo) > 0 &&
+          parseFloat(est.entregas_realizadas) > 0
+        ).length;
+
     const porcentajeLiquidacion = totalEstaciones > 0 ? (estacionesLiquidadas / totalEstaciones) * 100 : 0;
 
     // Calcular saldo pendiente por recolectar (suma de resguardos de estaciones)
@@ -389,6 +489,7 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
           estaciones_pendientes: estacionesPendientes,
           porcentaje_liquidacion: porcentajeLiquidacion
         },
+        periodo_contable_liquidado: periodoContableLiquidado,
         estaciones: estacionesResult.rows
       }
     });
@@ -403,58 +504,118 @@ async function getDashboardGerenteZona(usuario: any, periodo: any, res: Response
  */
 async function getDashboardDirector(usuario: any, periodo: any, res: Response) {
   try {
-    // Obtener resumen por zona
-    const zonasResult = await pool.query(`
-      SELECT 
-        z.id as zona_id,
-        z.nombre as zona_nombre,
-        0 as saldo_inicial,  -- TODO: Implementar saldo inicial
-        0 as entregas_recibidas,  -- TODO: Implementar entregas recibidas
-        0 as entregas_direccion,  -- TODO: Implementar entregas a dirección
-        COALESCE(
-          (SELECT SUM(g.monto) 
-           FROM gastos g 
-           JOIN estaciones e2 ON g.estacion_id = e2.id
-           WHERE e2.zona_id = z.id 
-           AND g.tipo_gasto = 'estacion'
-           AND g.fecha >= $1 
-           AND g.fecha <= $2), 
-          0
-        ) as gastos_zona,
-        COALESCE(SUM(rp.merma_importe), 0) - COALESCE(
-          (SELECT SUM(g.monto) 
-           FROM gastos g 
-           JOIN estaciones e2 ON g.estacion_id = e2.id
-           WHERE e2.zona_id = z.id 
-           AND g.tipo_gasto = 'estacion'
-           AND g.fecha >= $1 
-           AND g.fecha <= $2), 
-          0
-        ) as resguardo_actual
-      FROM zonas z
-      LEFT JOIN estaciones e ON e.zona_id = z.id AND e.activa = true
-      LEFT JOIN reportes r ON r.estacion_id = e.id 
-        AND DATE(r.fecha) >= $1
-        AND DATE(r.fecha) <= $2
-        AND r.estado = 'Aprobado'
-      LEFT JOIN reporte_productos rp ON rp.reporte_id = r.id
-      WHERE z.activa = true
-      GROUP BY z.id, z.nombre
-      ORDER BY z.nombre
-    `, [periodo.fecha_inicio, periodo.fecha_fin]);
+    const zonasBase = await pool.query(
+      `SELECT id as zona_id, nombre as zona_nombre
+       FROM zonas
+       WHERE activa = true
+       ORDER BY nombre`
+    );
+
+    const zonasResult = {
+      rows: await Promise.all(
+        zonasBase.rows.map(async (zona: any) => {
+          const saldoInicial = await obtenerSaldoInicialZona(zona.zona_id, periodo.anio, periodo.mes);
+
+          const movimientosResult = await pool.query(
+            `SELECT
+               COALESCE(
+                 (
+                   SELECT SUM(e.monto)
+                   FROM entregas e
+                   WHERE e.zona_id = $1
+                     AND e.tipo_entrega = 'estacion_zona'
+                     AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                     AND e.fecha >= $2
+                     AND e.fecha <= $3
+                 ),
+                 0
+               ) AS entregas_recibidas,
+               COALESCE(
+                 (
+                   SELECT SUM(e.monto)
+                   FROM entregas e
+                   WHERE e.zona_origen_id = $1
+                     AND e.tipo_entrega = 'zona_direccion'
+                     AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                     AND e.fecha >= $2
+                     AND e.fecha <= $3
+                 ),
+                 0
+               ) AS entregas_direccion,
+               COALESCE(
+                 (
+                   SELECT SUM(g.monto)
+                   FROM gastos g
+                   WHERE g.zona_id = $1
+                     AND g.tipo_gasto = 'zona'
+                     AND g.fecha >= $2
+                     AND g.fecha <= $3
+                 ),
+                 0
+               ) AS gastos_zona`,
+            [zona.zona_id, periodo.fecha_inicio, periodo.fecha_fin]
+          );
+
+          const entregasRecibidas = parseFloat(movimientosResult.rows[0]?.entregas_recibidas || '0');
+          const entregasDireccion = parseFloat(movimientosResult.rows[0]?.entregas_direccion || '0');
+          const gastosZona = parseFloat(movimientosResult.rows[0]?.gastos_zona || '0');
+          const resguardoActual = saldoInicial + entregasRecibidas - entregasDireccion - gastosZona;
+
+          return {
+            zona_id: zona.zona_id,
+            zona_nombre: zona.zona_nombre,
+            saldo_inicial: saldoInicial,
+            entregas_recibidas: entregasRecibidas,
+            entregas_direccion: entregasDireccion,
+            gastos_zona: gastosZona,
+            resguardo_actual: resguardoActual,
+          };
+        })
+      ),
+    };
 
     console.log('[getDashboardDirector] Zonas encontradas:', zonasResult.rows.length);
 
+    const fechaInicioDireccion = new Date(periodo.anio, periodo.mes - 1, 1);
+    const fechaFinDireccion = new Date(periodo.anio, periodo.mes, 0);
+    const anioAnterior = periodo.anio - (periodo.mes === 1 ? 1 : 0);
+    const mesAnterior = periodo.mes === 1 ? 12 : periodo.mes - 1;
+    const fechaInicioAnterior = new Date(anioAnterior, mesAnterior - 1, 1);
+    const fechaFinAnterior = new Date(anioAnterior, mesAnterior, 0);
+
+    const saldoDireccionInicialResult = await pool.query(
+      `SELECT COALESCE(SUM(e.monto), 0) as total
+       FROM entregas e
+       WHERE e.tipo_entrega = 'zona_direccion'
+         AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+         AND e.fecha >= $1
+         AND e.fecha <= $2`,
+      [fechaInicioAnterior, fechaFinAnterior]
+    );
+    const saldoDireccionInicial = parseFloat(saldoDireccionInicialResult.rows[0]?.total || '0');
+
+    const ingresosDireccionPeriodoResult = await pool.query(
+      `SELECT COALESCE(SUM(e.monto), 0) as total
+       FROM entregas e
+       WHERE e.tipo_entrega = 'zona_direccion'
+         AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+         AND e.fecha >= $1
+         AND e.fecha <= $2`,
+      [fechaInicioDireccion, fechaFinDireccion]
+    );
+    const ingresosDireccionPeriodo = parseFloat(ingresosDireccionPeriodoResult.rows[0]?.total || '0');
+    const saldoDireccionFinal = saldoDireccionInicial + ingresosDireccionPeriodo;
+
     const totales = {
-      saldo_inicial_total: 0,
-      entregas_recibidas_total: 0,
-      entregas_direccion_total: 0,
-      gastos_total: 0,
-      resguardo_total: zonasResult.rows.reduce((sum, zona) => sum + parseFloat(zona.resguardo_actual), 0)
+      saldo_inicial_total: saldoDireccionInicial,
+      entregas_recibidas_total: zonasResult.rows.reduce((sum, zona) => sum + Number(zona.entregas_recibidas || 0), 0),
+      entregas_direccion_total: saldoDireccionFinal,
+      gastos_total: zonasResult.rows.reduce((sum, zona) => sum + Number(zona.gastos_zona || 0), 0),
+      resguardo_total: zonasResult.rows.reduce((sum, zona) => sum + Number(zona.resguardo_actual || 0), 0)
     };
 
     return res.json({
-      tipo: usuario.role === 'Direccion' ? 'director' : 'admin',
+      tipo: usuario.role === 'Direccion' || usuario.role === 'DirectorOperaciones' ? 'director' : 'admin',
       data: {
         totales,
         zonas: zonasResult.rows
@@ -509,7 +670,8 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
-    if (monto <= 0) {
+    const montoNum = parseFloat(monto)
+    if (!Number.isFinite(montoNum) || montoNum <= 0) {
       return res.status(400).json({ error: 'El monto debe ser mayor a cero' });
     }
 
@@ -544,23 +706,9 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
     const fecha_inicio = new Date(anio, mes - 1, 1);
     const fecha_fin = new Date(anio, mes, 0);
 
-    // Verificar si el período está cerrado (cierre operativo)
-    if (tipo_gasto === 'estacion' && estacion_id) {
-      const cierreOperativoResult = await pool.query(
-        `SELECT zpc.esta_cerrado 
-         FROM zonas_periodos_cierre zpc
-         JOIN estaciones e ON e.zona_id = zpc.zona_id
-         WHERE e.id = $1 AND zpc.anio = $2 AND zpc.mes = $3 AND zpc.esta_cerrado = true`,
-        [estacion_id, anio, mes]
-      );
-
-      if (cierreOperativoResult.rows.length > 0) {
-        return res.status(403).json({ 
-          error: 'El período operativo está cerrado. No se pueden registrar gastos.',
-          detalle: 'El gerente de zona ya cerró el mes operativo para esta estación.'
-        });
-      }
-    }
+    // Nota de negocio:
+    // Los movimientos financieros (gastos/entregas) se controlan por cierre contable.
+    // El cierre operativo aplica para reportes de venta.
 
     // Verificar si hay cierre contable para la zona
     if (zona_id) {
@@ -596,15 +744,27 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
 
     // Validar límite de gastos
     const limiteResult = await pool.query(`
-      SELECT 
-        cl.limite_gastos,
-        COALESCE(SUM(g.monto), 0) as gastos_acumulados
-      FROM configuracion_limites cl
-      LEFT JOIN gastos g ON g.${tipo_gasto === 'estacion' ? 'estacion_id' : 'zona_id'} = cl.entidad_id
-        AND g.fecha >= $2
-        AND g.fecha <= $3
-      WHERE cl.entidad_id = $1 AND cl.entidad_tipo = $4 AND cl.activo = true
-      GROUP BY cl.limite_gastos
+      WITH limite AS (
+        SELECT lg.limite_mensual AS limite_gastos
+        FROM limites_gastos lg
+        WHERE lg.entidad_id = $1
+          AND lg.entidad_tipo = $4
+          AND lg.activo = true
+        ORDER BY lg.vigente_desde DESC NULLS LAST, lg.updated_at DESC NULLS LAST, lg.created_at DESC
+        LIMIT 1
+      ),
+      gastos_periodo AS (
+        SELECT COALESCE(SUM(g.monto), 0) AS gastos_acumulados
+        FROM gastos g
+        WHERE g.${tipo_gasto === 'estacion' ? 'estacion_id' : 'zona_id'} = $1
+          AND g.fecha >= $2
+          AND g.fecha <= $3
+          AND g.tipo_gasto = $4
+      )
+      SELECT l.limite_gastos, gp.gastos_acumulados
+      FROM limite l
+      CROSS JOIN gastos_periodo gp
+      WHERE l.limite_gastos IS NOT NULL
     `, [entidad_id, fecha_inicio, fecha_fin, tipo_gasto]);
 
     if (limiteResult.rows.length === 0) {
@@ -612,17 +772,93 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
     }
 
     const { limite_gastos, gastos_acumulados } = limiteResult.rows[0];
-    const gastos_totales = parseFloat(gastos_acumulados) + parseFloat(monto);
+    const limiteNum = parseFloat(limite_gastos);
+    const gastosAcumuladosNum = parseFloat(gastos_acumulados);
 
-    if (gastos_totales > parseFloat(limite_gastos)) {
-      const disponible = parseFloat(limite_gastos) - parseFloat(gastos_acumulados);
-      return res.status(400).json({ 
-        error: `Límite de gastos excedido. Disponible: $${disponible.toFixed(2)} de $${parseFloat(limite_gastos).toFixed(2)}`,
-        limite: parseFloat(limite_gastos),
-        acumulado: parseFloat(gastos_acumulados),
-        disponible: disponible
+    // Disponible por límite configurado.
+    const disponiblePorLimite = limiteNum - gastosAcumuladosNum;
+
+    // Disponible por saldo/resguardo real.
+    let disponiblePorResguardo = 0;
+    if (tipo_gasto === 'estacion') {
+      const resguardoEstacionResult = await pool.query(
+        `SELECT
+          COALESCE(SUM(rp.merma_importe), 0) AS merma_generada,
+          COALESCE(
+            (
+              SELECT SUM(e.monto)
+              FROM entregas e
+              WHERE e.estacion_id = $1
+                AND e.tipo_entrega = 'estacion_zona'
+                AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                AND e.fecha >= $2
+                AND e.fecha <= $3
+            ),
+            0
+          ) AS entregas_realizadas
+         FROM reportes r
+         JOIN reporte_productos rp ON rp.reporte_id = r.id
+         WHERE r.estacion_id = $1
+           AND r.fecha >= $2
+           AND r.fecha <= $3
+           AND r.estado = 'Aprobado'`,
+        [entidad_id, fecha_inicio, fecha_fin]
+      );
+
+      const mermaGenerada = parseFloat(resguardoEstacionResult.rows[0]?.merma_generada || '0');
+      const entregasRealizadas = parseFloat(resguardoEstacionResult.rows[0]?.entregas_realizadas || '0');
+      disponiblePorResguardo = mermaGenerada - entregasRealizadas - gastosAcumuladosNum;
+    } else {
+      const resguardoZonaResult = await pool.query(
+        `SELECT
+          COALESCE(
+            (
+              SELECT SUM(e.monto)
+              FROM entregas e
+              WHERE e.zona_id = $1
+                AND e.tipo_entrega = 'estacion_zona'
+                AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                AND e.fecha >= $2
+                AND e.fecha <= $3
+            ),
+            0
+          ) AS entregas_recibidas,
+          COALESCE(
+            (
+              SELECT SUM(e.monto)
+              FROM entregas e
+              WHERE e.zona_origen_id = $1
+                AND e.tipo_entrega = 'zona_direccion'
+                AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                AND e.fecha >= $2
+                AND e.fecha <= $3
+            ),
+            0
+          ) AS entregas_enviadas`,
+        [entidad_id, fecha_inicio, fecha_fin]
+      );
+
+      const entregasRecibidas = parseFloat(resguardoZonaResult.rows[0]?.entregas_recibidas || '0');
+      const entregasEnviadas = parseFloat(resguardoZonaResult.rows[0]?.entregas_enviadas || '0');
+      disponiblePorResguardo = entregasRecibidas - entregasEnviadas - gastosAcumuladosNum;
+    }
+
+    const disponibleEfectivo = Math.max(0, Math.min(disponiblePorLimite, disponiblePorResguardo));
+    const montoComparable = Math.round(montoNum * 100) / 100;
+    const disponibleComparable = Math.round(disponibleEfectivo * 100) / 100;
+
+    if (montoComparable > disponibleComparable + 0.000001) {
+      return res.status(400).json({
+        error: `Monto excedido. Disponible real: $${disponibleComparable.toFixed(2)} (límite: $${Math.max(0, disponiblePorLimite).toFixed(2)}, resguardo: $${Math.max(0, disponiblePorResguardo).toFixed(2)}).`,
+        limite: limiteNum,
+        acumulado: gastosAcumuladosNum,
+        disponible_por_limite: Math.max(0, disponiblePorLimite),
+        disponible_por_resguardo: Math.max(0, disponiblePorResguardo),
+        disponible: disponibleComparable
       });
     }
+
+    const gastos_totales = gastosAcumuladosNum + montoNum;
 
     // Insertar el gasto
     const insertQuery = tipo_gasto === 'estacion'
@@ -678,7 +914,7 @@ export const registrarGasto = async (req: AuthRequest, res: Response) => {
     return res.status(201).json({
       message: 'Gasto registrado exitosamente',
       gasto: gastoRegistrado,
-      limite_restante: parseFloat(limite_gastos) - gastos_totales
+      limite_restante: limiteNum - gastos_totales
     });
   } catch (error) {
     console.error('[registrarGasto] Error:', error);
@@ -768,27 +1004,29 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'No autorizado' });
     }
 
-    const { tipo_entrega, estacion_id, zona_id, fecha, monto, concepto } = req.body;
+    const { tipo_entrega, estacion_id, zona_id: zonaIdBody, fecha, monto, concepto, destinatario_id } = req.body;
+    const archivo = (req as any).file as Express.Multer.File | undefined;
 
     // Validar permisos según tipo de entrega
     if (tipo_entrega === 'estacion_zona') {
-      // Entregas de estación a zona: Solo Gerente de Zona o Admin
-      if (usuario.role !== 'GerenteZona' && usuario.role !== 'Administrador') {
-        return res.status(403).json({ error: 'Solo gerentes de zona pueden registrar entregas de estación a zona' });
+      // Nuevo flujo: la entrega la registra el gerente de estación (o admin).
+      if (usuario.role !== 'GerenteEstacion' && usuario.role !== 'Administrador') {
+        return res.status(403).json({ error: 'Solo gerentes de estación pueden registrar entregas de estación a zona' });
       }
     } else if (tipo_entrega === 'zona_direccion') {
-      // Entregas de zona a dirección: Solo Administrador
-      if (usuario.role !== 'Administrador') {
-        return res.status(403).json({ error: 'Solo administradores pueden registrar entregas de zona a dirección' });
+      // Entregas de zona a dirección: las inicia gerente de zona (o admin).
+      if (usuario.role !== 'GerenteZona' && usuario.role !== 'Administrador') {
+        return res.status(403).json({ error: 'Solo gerente de zona o administrador pueden registrar entregas de zona a dirección' });
       }
     }
 
     // Validaciones
-    if (!tipo_entrega || !zona_id || !fecha || !monto) {
+    if (!tipo_entrega || !fecha || !monto) {
       return res.status(400).json({ error: 'Faltan campos requeridos' });
     }
 
-    if (monto <= 0) {
+    const montoNum = parseFloat(monto)
+    if (!Number.isFinite(montoNum) || montoNum <= 0) {
       return res.status(400).json({ error: 'El monto debe ser mayor a cero' });
     }
 
@@ -796,17 +1034,73 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Se requiere estacion_id para entregas de estación a zona' });
     }
 
-    // Verificar que el gerente de zona tenga acceso a la zona
-    if (usuario.role === 'GerenteZona') {
-      const usuarioResult = await pool.query(
-        `SELECT zona_id FROM users WHERE id = $1`,
-        [usuario.id]
+    if (tipo_entrega === 'zona_direccion' && !destinatario_id) {
+      return res.status(400).json({ error: 'Se requiere seleccionar el usuario destino (Dirección/Director Operaciones)' });
+    }
+
+    // En el nuevo flujo, el gerente de estación debe tener permiso sobre la estación
+    if (tipo_entrega === 'estacion_zona' && usuario.role === 'GerenteEstacion') {
+      const estacionesAsignadasResult = await pool.query(
+        `SELECT estacion_id FROM user_estaciones WHERE user_id = $1 AND estacion_id = $2`,
+        [usuario.id, estacion_id]
       );
 
-      const zonaUsuario = usuarioResult.rows[0]?.zona_id;
-      
-      if (zonaUsuario !== zona_id) {
-        return res.status(403).json({ error: 'No tiene permiso para registrar entregas en esta zona' });
+      if (estacionesAsignadasResult.rows.length === 0) {
+        return res.status(403).json({ error: 'No tiene permiso para registrar entregas en esta estación' });
+      }
+    }
+
+    // Resolver zona_id real desde estación para evitar inconsistencias
+    let zona_id = zonaIdBody as string | undefined;
+    if (tipo_entrega === 'estacion_zona') {
+      const estacionZonaResult = await pool.query(
+        `SELECT e.zona_id, z.nombre as zona_nombre
+         FROM estaciones e
+         JOIN zonas z ON z.id = e.zona_id
+         WHERE e.id = $1 AND e.activa = true`,
+        [estacion_id]
+      );
+
+      if (estacionZonaResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Estación inválida o inactiva' });
+      }
+
+      zona_id = estacionZonaResult.rows[0].zona_id;
+
+      if (!archivo) {
+        return res.status(400).json({
+          error: 'Se requiere archivo de evidencia para registrar la entrega',
+          detalle: 'Adjunta un archivo antes de enviar la entrega.'
+        });
+      }
+    }
+
+    if (tipo_entrega === 'zona_direccion' && usuario.role === 'GerenteZona') {
+      const userZonaResult = await pool.query('SELECT zona_id FROM users WHERE id = $1', [usuario.id]);
+      zona_id = userZonaResult.rows[0]?.zona_id;
+    }
+
+    if (!zona_id) {
+      return res.status(400).json({ error: 'No se pudo determinar la zona de la entrega' });
+    }
+
+    if (tipo_entrega === 'zona_direccion') {
+      const destinatarioResult = await pool.query(
+        `SELECT u.id, r.codigo as role_codigo
+         FROM users u
+         LEFT JOIN roles r ON r.id = u.role_id
+         WHERE u.id = $1
+         LIMIT 1`,
+        [destinatario_id]
+      );
+
+      if (destinatarioResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Usuario destino no válido' });
+      }
+
+      const roleDestino = destinatarioResult.rows[0].role_codigo || null;
+      if (roleDestino !== 'Direccion' && roleDestino !== 'DirectorOperaciones') {
+        return res.status(400).json({ error: 'El usuario destino debe tener rol Dirección o DirectorOperaciones' });
       }
     }
 
@@ -825,20 +1119,6 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Ejercicio fiscal no encontrado o inactivo' });
     }
 
-    // Verificar cierre operativo
-    const cierreOperativoResult = await pool.query(
-      `SELECT esta_cerrado FROM zonas_periodos_cierre 
-       WHERE zona_id = $1 AND anio = $2 AND mes = $3 AND esta_cerrado = true`,
-      [zona_id, anio, mes]
-    );
-
-    if (cierreOperativoResult.rows.length > 0) {
-      return res.status(403).json({ 
-        error: 'El período operativo está cerrado. No se pueden registrar entregas.',
-        detalle: 'El mes ya fue cerrado operativamente.'
-      });
-    }
-
     // Verificar cierre contable
     const cierreContableResult = await pool.query(
       `SELECT estado FROM liquidaciones_mensuales 
@@ -846,7 +1126,7 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       [zona_id, anio, mes]
     );
 
-    if (cierreContableResult.rows.length > 0) {
+    if (tipo_entrega !== 'zona_direccion' && cierreContableResult.rows.length > 0) {
       return res.status(403).json({ 
         error: 'El período contable está liquidado y cerrado. No se pueden registrar entregas.',
         detalle: 'Debe reabrir la liquidación para modificar datos.'
@@ -864,6 +1144,7 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
                     AND EXTRACT(MONTH FROM g.fecha) = $2 AND EXTRACT(YEAR FROM g.fecha) = $3), 0) as gastos_realizados,
           COALESCE((SELECT SUM(e.monto) FROM entregas e 
                     WHERE e.estacion_id = $1 AND e.tipo_entrega = 'estacion_zona'
+                    AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
                     AND EXTRACT(MONTH FROM e.fecha) = $2 AND EXTRACT(YEAR FROM e.fecha) = $3), 0) as entregas_realizadas
         FROM reporte_productos rp
         JOIN reportes r ON rp.reporte_id = r.id
@@ -877,21 +1158,18 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       const saldo_disponible = parseFloat(merma_generada) - parseFloat(gastos_realizados) - parseFloat(entregas_realizadas);
 
       // Redondear ambos valores a 2 decimales para evitar errores de precisión de punto flotante
-      const montoRedondeado = Math.round(monto * 10000) / 10000;
+      const montoRedondeado = Math.round(montoNum * 10000) / 10000;
       const saldoRedondeado = Math.round(saldo_disponible * 10000) / 10000;
 
       if (montoRedondeado > saldoRedondeado) {
-        return res.status(400).json({ 
-          error: 'Saldo insuficiente en la estación',
-          detalle: `La estación solo tiene $${saldo_disponible.toFixed(2)} disponible. No se pueden entregar $${monto.toFixed(2)}.`,
-          saldo_disponible: saldo_disponible,
-          merma_generada: parseFloat(merma_generada),
-          gastos_realizados: parseFloat(gastos_realizados),
-          entregas_realizadas: parseFloat(entregas_realizadas)
-        });
+        // Regla de negocio: permitir sobre-entrega cuando operación lo requiera.
+        // Se registra aviso en logs para trazabilidad.
+        console.warn(
+          `[registrarEntrega] Sobre-entrega permitida ESTACIÓN: Disponible=$${saldo_disponible.toFixed(2)}, Entregando=$${montoNum.toFixed(2)}`
+        )
       }
 
-      console.log(`[registrarEntrega] Validación de saldo ESTACIÓN: Disponible=$${saldo_disponible.toFixed(2)}, Entregando=$${monto.toFixed(2)}`);
+      console.log(`[registrarEntrega] Validación de saldo ESTACIÓN: Disponible=$${saldo_disponible.toFixed(2)}, Entregando=$${montoNum.toFixed(2)}`);
     }
 
     if (tipo_entrega === 'zona_direccion') {
@@ -900,12 +1178,14 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
         `SELECT 
           COALESCE((SELECT SUM(e.monto) FROM entregas e 
                     WHERE e.zona_id = $1 AND e.tipo_entrega = 'estacion_zona'
+                    AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
                     AND EXTRACT(MONTH FROM e.fecha) = $2 AND EXTRACT(YEAR FROM e.fecha) = $3), 0) as entregas_recibidas,
           COALESCE((SELECT SUM(g.monto) FROM gastos g 
                     WHERE g.zona_id = $1 AND g.tipo_gasto = 'zona'
                     AND EXTRACT(MONTH FROM g.fecha) = $2 AND EXTRACT(YEAR FROM g.fecha) = $3), 0) as gastos_zona,
           COALESCE((SELECT SUM(e.monto) FROM entregas e 
                     WHERE e.zona_origen_id = $1 AND e.tipo_entrega = 'zona_direccion'
+                    AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
                     AND EXTRACT(MONTH FROM e.fecha) = $2 AND EXTRACT(YEAR FROM e.fecha) = $3), 0) as entregas_enviadas`,
         [zona_id, mes, anio]
       );
@@ -914,13 +1194,13 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       const resguardo_disponible = parseFloat(entregas_recibidas) - parseFloat(gastos_zona) - parseFloat(entregas_enviadas);
 
       // Redondear ambos valores a 2 decimales para evitar errores de precisión de punto flotante
-      const montoRedondeado = Math.round(monto * 10000) / 10000;
+      const montoRedondeado = Math.round(montoNum * 10000) / 10000;
       const resguardoRedondeado = Math.round(resguardo_disponible * 10000) / 10000;
 
       if (montoRedondeado > resguardoRedondeado) {
         return res.status(400).json({ 
           error: 'Resguardo insuficiente en la zona',
-          detalle: `La zona solo tiene $${resguardo_disponible.toFixed(2)} disponible. No se pueden entregar $${monto.toFixed(2)}.`,
+          detalle: `La zona solo tiene $${resguardo_disponible.toFixed(2)} disponible. No se pueden entregar $${montoNum.toFixed(2)}.`,
           resguardo_disponible: resguardo_disponible,
           entregas_recibidas: parseFloat(entregas_recibidas),
           gastos_zona: parseFloat(gastos_zona),
@@ -928,19 +1208,34 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
         });
       }
 
-      console.log(`[registrarEntrega] Validación de saldo ZONA: Disponible=$${resguardo_disponible.toFixed(2)}, Entregando=$${monto.toFixed(2)}`);
+      console.log(`[registrarEntrega] Validación de saldo ZONA: Disponible=$${resguardo_disponible.toFixed(2)}, Entregando=$${montoNum.toFixed(2)}`);
     }
 
     // Insertar la entrega
     const insertQuery = tipo_entrega === 'estacion_zona'
-      ? `INSERT INTO entregas (fecha, tipo_entrega, estacion_id, zona_id, monto, concepto, capturado_por)
-         VALUES ($1, 'estacion_zona', $2, $3, $4, $5, $6) RETURNING *`
-      : `INSERT INTO entregas (fecha, tipo_entrega, zona_origen_id, monto, concepto, capturado_por)
-         VALUES ($1, 'zona_direccion', $2, $3, $4, $5) RETURNING *`;
+      ? `INSERT INTO entregas (
+           fecha, tipo_entrega, estacion_id, zona_id, monto, concepto, capturado_por,
+           estado_entrega, archivo_nombre, archivo_ruta, archivo_mime, archivo_tamano
+         )
+         VALUES ($1, 'estacion_zona', $2, $3, $4, $5, $6, 'pendiente_firma', $7, $8, $9, $10)
+         RETURNING *`
+      : `INSERT INTO entregas (fecha, tipo_entrega, zona_origen_id, monto, concepto, capturado_por, estado_entrega, destinatario_id)
+         VALUES ($1, 'zona_direccion', $2, $3, $4, $5, 'pendiente_firma', $6) RETURNING *`;
 
     const params = tipo_entrega === 'estacion_zona'
-      ? [fecha, estacion_id, zona_id, monto, concepto || '', usuario.id]
-      : [fecha, zona_id, monto, concepto || '', usuario.id];
+      ? [
+          fecha,
+          estacion_id,
+          zona_id,
+          montoNum,
+          concepto || '',
+          usuario.id,
+          archivo?.originalname || null,
+          archivo?.path || null,
+          archivo?.mimetype || null,
+          archivo?.size || null
+        ]
+      : [fecha, zona_id, montoNum, concepto || '', usuario.id, destinatario_id];
 
     const result = await pool.query(insertQuery, params);
     const entregaRegistrada = result.rows[0];
@@ -954,11 +1249,11 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       const zonaResult = await pool.query('SELECT nombre FROM zonas WHERE id = $1', [zona_id]);
       const nombreEstacion = estacionResult.rows[0]?.nombre || estacion_id;
       const nombreZona = zonaResult.rows[0]?.nombre || zona_id;
-      descripcionEntrega = `Entrega de estación "${nombreEstacion}" a zona "${nombreZona}": $${monto.toFixed(2)} - ${concepto || 'Sin concepto'}`;
+      descripcionEntrega = `Solicitud de entrega de estación "${nombreEstacion}" a zona "${nombreZona}": $${montoNum.toFixed(2)} - ${concepto || 'Sin concepto'}`;
     } else {
       const zonaResult = await pool.query('SELECT nombre FROM zonas WHERE id = $1', [zona_id]);
       const nombreZona = zonaResult.rows[0]?.nombre || zona_id;
-      descripcionEntrega = `Entrega de zona "${nombreZona}" a dirección: $${monto.toFixed(2)} - ${concepto || 'Sin concepto'}`;
+      descripcionEntrega = `Entrega de zona "${nombreZona}" a dirección: $${montoNum.toFixed(2)} - ${concepto || 'Sin concepto'}`;
     }
 
     // Registrar en auditoría
@@ -972,8 +1267,9 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
       datosNuevos: {
         fecha,
         tipo_entrega,
-        monto,
-        concepto: concepto || ''
+        monto: montoNum,
+        concepto: concepto || '',
+        destinatario_id: tipo_entrega === 'zona_direccion' ? destinatario_id : null
       },
       metadata: {
         fecha_entrega: fecha
@@ -981,7 +1277,9 @@ export const registrarEntrega = async (req: AuthRequest, res: Response) => {
     });
 
     return res.status(201).json({
-      message: 'Entrega registrada exitosamente',
+      message: tipo_entrega === 'estacion_zona'
+        ? 'Entrega registrada y enviada para firma del gerente de zona'
+        : 'Entrega registrada y enviada para firma de dirección / director operaciones',
       entrega: entregaRegistrada
     });
   } catch (error) {
@@ -1001,7 +1299,7 @@ export const obtenerEntregas = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'No autorizado' });
     }
 
-    const { estacion_id, zona_id, mes, anio } = req.query;
+    const { estacion_id, zona_id, mes, anio, estado } = req.query;
 
     if (!estacion_id && !zona_id) {
       return res.status(400).json({ error: 'Se requiere estacion_id o zona_id' });
@@ -1034,6 +1332,12 @@ export const obtenerEntregas = async (req: AuthRequest, res: Response) => {
       paramIndex++;
     }
 
+    if (estado) {
+      query += ` AND e.estado_entrega = $${paramIndex}`;
+      params.push(estado);
+      paramIndex++;
+    }
+
     if (mes && anio) {
       // Calcular fechas del período directamente
       const mesNum = parseInt(mes as string);
@@ -1057,6 +1361,259 @@ export const obtenerEntregas = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error('[obtenerEntregas] Error:', error);
     res.status(500).json({ error: 'Error al obtener entregas' });
+  }
+};
+
+export const obtenerEntregasPendientesFirma = async (req: AuthRequest, res: Response) => {
+  try {
+    const usuario = req.user;
+    if (!usuario) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+
+    const esGerenteZona = usuario.role === 'GerenteZona';
+    const puedeFirmarZona = esGerenteZona || usuario.role === 'Administrador';
+    const puedeFirmarDireccion = usuario.role === 'Direccion' || usuario.role === 'DirectorOperaciones' || usuario.role === 'Administrador';
+
+    if (!puedeFirmarZona && !puedeFirmarDireccion) {
+      return res.status(403).json({ error: 'No tiene permisos para firmar entregas' });
+    }
+
+    const { mes, anio, zona_id } = req.query;
+    const mesNum = parseInt((mes as string) || '', 10);
+    const anioNum = parseInt((anio as string) || '', 10);
+
+    if (esGerenteZona && (!mesNum || !anioNum)) {
+      return res.status(400).json({ error: 'Se requiere mes y anio' });
+    }
+
+    let zonaId = zona_id as string | undefined;
+    if (esGerenteZona) {
+      const userZonaResult = await pool.query('SELECT zona_id FROM users WHERE id = $1', [usuario.id]);
+      zonaId = userZonaResult.rows[0]?.zona_id;
+    }
+
+    if (esGerenteZona && !zonaId) {
+      return res.status(400).json({ error: 'No se pudo determinar la zona para consultar pendientes' });
+    }
+
+    let result;
+    if (esGerenteZona) {
+      result = await pool.query(
+        `SELECT
+           e.id,
+           e.fecha,
+           e.tipo_entrega,
+           e.monto,
+           e.concepto,
+           e.estado_entrega,
+           e.archivo_nombre,
+           e.archivo_ruta,
+           est.id as estacion_id,
+           est.nombre as estacion_nombre,
+           z.id as zona_id,
+           z.nombre as zona_nombre,
+           u.name as capturado_por_nombre
+         FROM entregas e
+         INNER JOIN estaciones est ON est.id = e.estacion_id
+         INNER JOIN zonas z ON z.id = e.zona_id
+         LEFT JOIN users u ON u.id = e.capturado_por
+         WHERE e.tipo_entrega = 'estacion_zona'
+           AND e.estado_entrega = 'pendiente_firma'
+           AND e.zona_id = $1
+           AND EXTRACT(MONTH FROM e.fecha) = $2
+           AND EXTRACT(YEAR FROM e.fecha) = $3
+         ORDER BY e.fecha DESC, est.nombre ASC`,
+        [zonaId, mesNum, anioNum]
+      );
+    } else if (usuario.role === 'Direccion' || usuario.role === 'DirectorOperaciones') {
+      result = await pool.query(
+        `SELECT
+           e.id,
+           e.fecha,
+           e.tipo_entrega,
+           e.monto,
+           e.concepto,
+           e.estado_entrega,
+           e.destinatario_id,
+           NULL::uuid as estacion_id,
+           NULL::text as estacion_nombre,
+           z.id as zona_id,
+           z.nombre as zona_nombre,
+           u.name as capturado_por_nombre,
+           ud.name as destinatario_nombre
+         FROM entregas e
+         INNER JOIN zonas z ON z.id = e.zona_origen_id
+         LEFT JOIN users u ON u.id = e.capturado_por
+         LEFT JOIN users ud ON ud.id = e.destinatario_id
+         WHERE e.tipo_entrega = 'zona_direccion'
+           AND e.estado_entrega = 'pendiente_firma'
+           AND e.destinatario_id = $1
+         ORDER BY e.fecha DESC, z.nombre ASC`,
+        [usuario.id]
+      );
+    } else {
+      result = await pool.query(
+        `SELECT
+           e.id,
+           e.fecha,
+           e.tipo_entrega,
+           e.monto,
+           e.concepto,
+           e.estado_entrega,
+           e.destinatario_id,
+           NULL::uuid as estacion_id,
+           NULL::text as estacion_nombre,
+           z.id as zona_id,
+           z.nombre as zona_nombre,
+           u.name as capturado_por_nombre,
+           ud.name as destinatario_nombre
+         FROM entregas e
+         INNER JOIN zonas z ON z.id = e.zona_origen_id
+         LEFT JOIN users u ON u.id = e.capturado_por
+         LEFT JOIN users ud ON ud.id = e.destinatario_id
+         WHERE e.estado_entrega = 'pendiente_firma'
+           AND e.tipo_entrega IN ('zona_direccion', 'estacion_zona')
+           ${zonaId ? 'AND (e.zona_origen_id = $1 OR e.zona_id = $1)' : ''}
+         ORDER BY e.fecha DESC, z.nombre ASC`,
+        zonaId ? [zonaId] : []
+      );
+    }
+
+    return res.json({
+      entregas: result.rows,
+      total: result.rows.length,
+      zona_id: zonaId || null,
+    });
+  } catch (error) {
+    console.error('[obtenerEntregasPendientesFirma] Error:', error);
+    res.status(500).json({ error: 'Error al obtener entregas pendientes de firma' });
+  }
+};
+
+export const firmarEntrega = async (req: AuthRequest, res: Response) => {
+  try {
+    const usuario = req.user;
+    if (!usuario) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+
+    const puedeFirmarZona = usuario.role === 'GerenteZona' || usuario.role === 'Administrador';
+    const puedeFirmarDireccion = usuario.role === 'Direccion' || usuario.role === 'DirectorOperaciones' || usuario.role === 'Administrador';
+
+    if (!puedeFirmarZona && !puedeFirmarDireccion) {
+      return res.status(403).json({ error: 'No tiene permisos para firmar entregas' });
+    }
+
+    const { id } = req.params;
+    const { observaciones } = req.body || {};
+
+    const entregaResult = await pool.query(
+      `SELECT e.id, e.tipo_entrega, e.zona_id, e.zona_origen_id, e.destinatario_id, e.estado_entrega, z.nombre as zona_nombre
+       FROM entregas e
+       LEFT JOIN zonas z ON z.id = COALESCE(e.zona_id, e.zona_origen_id)
+       WHERE e.id = $1`,
+      [id]
+    );
+
+    if (entregaResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Entrega no encontrada' });
+    }
+
+    const entrega = entregaResult.rows[0];
+    if (entrega.estado_entrega !== 'pendiente_firma') {
+      return res.status(400).json({ error: 'La entrega ya fue firmada o no está en estado pendiente' });
+    }
+
+    if (entrega.tipo_entrega === 'estacion_zona') {
+      if (!puedeFirmarZona) {
+        return res.status(403).json({ error: 'Solo gerente de zona o admin pueden firmar entregas de estación a zona' });
+      }
+
+      if (usuario.role === 'GerenteZona') {
+        const userZonaResult = await pool.query('SELECT zona_id FROM users WHERE id = $1', [usuario.id]);
+        const zonaUsuario = userZonaResult.rows[0]?.zona_id;
+        if (zonaUsuario !== entrega.zona_id) {
+          return res.status(403).json({ error: 'No tiene permiso para firmar entregas de esta zona' });
+        }
+      }
+    } else if (entrega.tipo_entrega === 'zona_direccion') {
+      if (!puedeFirmarDireccion) {
+        return res.status(403).json({ error: 'Solo dirección, director operaciones o admin pueden firmar entregas de zona a dirección' });
+      }
+
+      if ((usuario.role === 'Direccion' || usuario.role === 'DirectorOperaciones') && entrega.destinatario_id !== usuario.id) {
+        return res.status(403).json({ error: 'Esta entrega no fue asignada a su usuario' });
+      }
+    } else {
+      return res.status(400).json({ error: 'Tipo de entrega no soportado para firma' });
+    }
+
+    const updateResult = await pool.query(
+      `UPDATE entregas
+       SET estado_entrega = 'confirmada',
+           firmado_por = $1,
+           fecha_firma = CURRENT_TIMESTAMP,
+           observaciones_firma = $2
+       WHERE id = $3
+       RETURNING *`,
+      [usuario.id, observaciones || null, id]
+    );
+
+    await registrarAuditoriaGeneral({
+      entidadTipo: 'ENTREGA',
+      entidadId: id,
+      usuarioId: usuario.id,
+      usuarioNombre: usuario.name || usuario.email,
+      accion: 'ACTUALIZAR',
+      descripcion:
+        entrega.tipo_entrega === 'zona_direccion'
+          ? `Firma de recepción de entrega de zona "${entrega.zona_nombre || entrega.zona_origen_id}" hacia dirección`
+          : `Firma de conformidad de entrega en zona "${entrega.zona_nombre || entrega.zona_id}"`,
+      datosNuevos: {
+        estado_entrega: 'confirmada',
+        observaciones_firma: observaciones || null,
+      },
+    });
+
+    return res.json({
+      message:
+        entrega.tipo_entrega === 'zona_direccion'
+          ? 'Entrega de zona a dirección firmada'
+          : 'Entrega firmada de conformidad',
+      entrega: updateResult.rows[0],
+    });
+  } catch (error) {
+    console.error('[firmarEntrega] Error:', error);
+    res.status(500).json({ error: 'Error al firmar entrega' });
+  }
+};
+
+export const obtenerFirmantesDireccion = async (req: AuthRequest, res: Response) => {
+  try {
+    const usuario = req.user;
+    if (!usuario) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
+
+    if (usuario.role !== 'GerenteZona' && usuario.role !== 'Administrador') {
+      return res.status(403).json({ error: 'No tiene permisos para consultar firmantes' });
+    }
+
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, r.codigo as role
+       FROM users u
+       LEFT JOIN roles r ON r.id = u.role_id
+       WHERE r.codigo IN ('Direccion', 'DirectorOperaciones')
+       ORDER BY
+         CASE r.codigo WHEN 'Direccion' THEN 1 ELSE 2 END,
+         u.name ASC`
+    );
+
+    return res.json({ usuarios: result.rows });
+  } catch (error) {
+    console.error('[obtenerFirmantesDireccion] Error:', error);
+    return res.status(500).json({ error: 'Error al consultar firmantes disponibles' });
   }
 };
 
@@ -1139,6 +1696,7 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
            FROM entregas en 
            WHERE en.estacion_id = e.id 
            AND en.tipo_entrega = 'estacion_zona'
+           AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
            AND en.fecha >= $2 
            AND en.fecha <= $3), 
           0
@@ -1158,6 +1716,7 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
            FROM entregas en 
            WHERE en.estacion_id = e.id 
            AND en.tipo_entrega = 'estacion_zona'
+           AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
            AND en.fecha >= $2 
            AND en.fecha <= $3), 
           0
@@ -1182,32 +1741,19 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
       ORDER BY e.nombre
     `, [zona_id, fecha_inicio, fecha_fin]);
 
-    // Validar que todas las estaciones con actividad estén en $0
-    const estacionesPendientes = estacionesResult.rows.filter(est => {
-      const saldo = parseFloat(est.saldo_resguardo);
-      const merma = parseFloat(est.merma_generada);
-      return merma > 0 && saldo !== 0;
-    });
-
-    if (estacionesPendientes.length > 0) {
-      return res.status(400).json({ 
-        error: 'No se puede cerrar el período. Hay estaciones con saldo pendiente.',
-        estaciones_pendientes: estacionesPendientes.map(e => ({
-          nombre: e.estacion_nombre,
-          saldo: parseFloat(e.saldo_resguardo)
-        }))
-      });
-    }
-
-    // Calcular datos financieros de la zona
-    const saldoInicialResult = await pool.query(
-      `SELECT saldo_final FROM liquidaciones_mensuales 
-       WHERE zona_id = $1 AND anio = $2 AND mes = $3 AND estado = 'cerrado'
-       ORDER BY fecha_cierre DESC LIMIT 1`,
-      [zona_id, anio - (mes === 1 ? 1 : 0), mes === 1 ? 12 : mes - 1]
+    // Se permite liquidar aunque existan saldos en estaciones.
+    // Estos saldos se guardan como diferencia por estación y total de diferencia por zona.
+    const totalMermaEstaciones = estacionesResult.rows.reduce(
+      (sum, est) => sum + parseFloat(est.merma_generada || '0'),
+      0
+    );
+    const diferenciaTotalEstaciones = estacionesResult.rows.reduce(
+      (sum, est) => sum + parseFloat(est.saldo_resguardo || '0'),
+      0
     );
 
-    const saldo_inicial = parseFloat(saldoInicialResult.rows[0]?.saldo_final || '0');
+    // Calcular datos financieros de la zona
+    const saldo_inicial = await obtenerSaldoInicialZona(zona_id, anio, mes);
 
     const entregasRecibidasResult = await pool.query(`
       SELECT COALESCE(SUM(en.monto), 0) as total
@@ -1215,6 +1761,7 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
       JOIN estaciones e ON e.id = en.estacion_id
       WHERE e.zona_id = $1
         AND en.tipo_entrega = 'estacion_zona'
+        AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
         AND en.fecha >= $2
         AND en.fecha <= $3
     `, [zona_id, fecha_inicio, fecha_fin]);
@@ -1224,8 +1771,9 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
     const entregasDireccionResult = await pool.query(`
       SELECT COALESCE(SUM(en.monto), 0) as total
       FROM entregas en
-      WHERE en.zona_id = $1
+      WHERE en.zona_origen_id = $1
         AND en.tipo_entrega = 'zona_direccion'
+        AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
         AND en.fecha >= $2
         AND en.fecha <= $3
     `, [zona_id, fecha_inicio, fecha_fin]);
@@ -1250,26 +1798,52 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
       // Actualizar liquidación existente
       await pool.query(`
         UPDATE liquidaciones_mensuales
-        SET saldo_inicial = $1,
+        SET merma_generada = $1,
             entregas_realizadas = $2,
             gastos_realizados = $3,
-            saldo_final = $4,
+            saldo_inicial = $4,
+            saldo_final = $5,
+            diferencia = $6,
             fecha_cierre = CURRENT_TIMESTAMP,
-            cerrado_por = $5,
+            cerrado_por = $7,
             estado = 'cerrado',
-            observaciones = $6,
+            observaciones = $8,
             updated_at = CURRENT_TIMESTAMP
-        WHERE zona_id = $7 AND anio = $8 AND mes = $9
-      `, [saldo_inicial, entregas_recibidas + entregas_direccion, gastos_zona, saldo_final, usuario.id, observaciones || null, zona_id, anio, mes]);
+        WHERE zona_id = $9 AND anio = $10 AND mes = $11
+      `, [
+        totalMermaEstaciones,
+        entregas_recibidas + entregas_direccion,
+        gastos_zona,
+        saldo_inicial,
+        saldo_final,
+        diferenciaTotalEstaciones,
+        usuario.id,
+        observaciones || null,
+        zona_id,
+        anio,
+        mes
+      ]);
     } else {
       // Crear nueva liquidación
       await pool.query(`
         INSERT INTO liquidaciones_mensuales (
           zona_id, anio, mes, merma_generada, entregas_realizadas, 
-          gastos_realizados, saldo_inicial, saldo_final, estado, 
+          gastos_realizados, saldo_inicial, saldo_final, diferencia, estado, 
           fecha_cierre, cerrado_por, observaciones
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'cerrado', CURRENT_TIMESTAMP, $9, $10)
-      `, [zona_id, anio, mes, entregas_recibidas, entregas_recibidas + entregas_direccion, gastos_zona, saldo_inicial, saldo_final, usuario.id, observaciones || null]);
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'cerrado', CURRENT_TIMESTAMP, $10, $11)
+      `, [
+        zona_id,
+        anio,
+        mes,
+        totalMermaEstaciones,
+        entregas_recibidas + entregas_direccion,
+        gastos_zona,
+        saldo_inicial,
+        saldo_final,
+        diferenciaTotalEstaciones,
+        usuario.id,
+        observaciones || null
+      ]);
     }
 
     // Registrar liquidaciones de estaciones
@@ -1287,15 +1861,17 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
               entregas_realizadas = $2,
               gastos_realizados = $3,
               saldo_final = $4,
+              diferencia = $5,
               estado = 'cerrado',
               fecha_cierre = CURRENT_TIMESTAMP,
-              cerrado_por = $5,
+              cerrado_por = $6,
               updated_at = CURRENT_TIMESTAMP
-          WHERE estacion_id = $6 AND anio = $7 AND mes = $8
+          WHERE estacion_id = $7 AND anio = $8 AND mes = $9
         `, [
           parseFloat(estacion.merma_generada),
           parseFloat(estacion.entregas_realizadas),
           parseFloat(estacion.gastos_realizados),
+          parseFloat(estacion.saldo_resguardo),
           parseFloat(estacion.saldo_resguardo),
           usuario.id,
           estacion.estacion_id,
@@ -1306,9 +1882,9 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
         await pool.query(`
           INSERT INTO liquidaciones_mensuales (
             estacion_id, anio, mes, merma_generada, entregas_realizadas, 
-            gastos_realizados, saldo_inicial, saldo_final, estado, 
+            gastos_realizados, saldo_inicial, saldo_final, diferencia, estado, 
             fecha_cierre, cerrado_por
-          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, 'cerrado', CURRENT_TIMESTAMP, $8)
+          ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, 'cerrado', CURRENT_TIMESTAMP, $9)
         `, [
           estacion.estacion_id,
           anio,
@@ -1316,6 +1892,7 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
           parseFloat(estacion.merma_generada),
           parseFloat(estacion.entregas_realizadas),
           parseFloat(estacion.gastos_realizados),
+          parseFloat(estacion.saldo_resguardo),
           parseFloat(estacion.saldo_resguardo),
           usuario.id
         ]);
@@ -1334,6 +1911,7 @@ export const cerrarPeriodoContable = async (req: AuthRequest, res: Response) => 
         entregas_direccion,
         gastos_zona,
         saldo_final,
+        diferencia_total_estaciones: diferenciaTotalEstaciones,
         fecha_cierre: new Date()
       }
     });
@@ -1477,6 +2055,7 @@ export const obtenerResguardoEstacion = async (req: AuthRequest, res: Response) 
       FROM entregas en
       WHERE en.estacion_id = $1
         AND en.tipo_entrega = 'estacion_zona'
+        AND COALESCE(en.estado_entrega, 'confirmada') = 'confirmada'
         AND en.fecha >= $2
         AND en.fecha <= $3
     `, [estacion_id, fecha_inicio, fecha_fin]);
@@ -1578,17 +2157,22 @@ export const verificarEstadoPeriodo = async (req: AuthRequest, res: Response) =>
       cierre_contable = cierreContableResult.rows[0].estado === 'cerrado';
     }
 
+    // Regla de negocio:
+    // - Cierre operativo: bloquea captura/edición de reportes operativos.
+    // - Cierre contable: bloquea movimientos financieros (gastos/entregas/liquidación).
+    const financiero_abierto = !cierre_contable;
+
     return res.json({
-      periodo_abierto: !cierre_operativo && !cierre_contable,
+      periodo_abierto: financiero_abierto,
       cierre_operativo,
       cierre_contable,
-      puede_registrar_gastos: !cierre_operativo && !cierre_contable,
-      puede_registrar_entregas: !cierre_operativo && !cierre_contable,
-      mensaje: cierre_contable 
-        ? 'Período liquidado y cerrado contablemente'
-        : cierre_operativo 
-        ? 'Período cerrado operativamente'
-        : 'Período abierto para registros'
+      puede_registrar_gastos: financiero_abierto,
+      puede_registrar_entregas: financiero_abierto,
+      mensaje: cierre_contable
+        ? 'Período contable cerrado: movimientos financieros bloqueados'
+        : cierre_operativo
+        ? 'Período operativo cerrado: reportes operativos bloqueados, finanzas permitidas'
+        : 'Período abierto para registros financieros'
     });
   } catch (error) {
     console.error('[verificarEstadoPeriodo] Error:', error);
@@ -1625,26 +2209,113 @@ export const obtenerLimiteDisponible = async (req: AuthRequest, res: Response) =
     const campo_id = entidad_tipo === 'estacion' ? 'estacion_id' : 'zona_id';
     
     const result = await pool.query(`
-      SELECT 
-        cl.limite_gastos,
-        COALESCE(SUM(g.monto), 0) as gastos_acumulados,
-        cl.limite_gastos - COALESCE(SUM(g.monto), 0) as disponible
-      FROM configuracion_limites cl
-      LEFT JOIN gastos g ON g.${campo_id} = cl.entidad_id
-        AND g.fecha >= $2
-        AND g.fecha <= $3
-      WHERE cl.entidad_id = $1 AND cl.entidad_tipo = $4 AND cl.activo = true
-      GROUP BY cl.limite_gastos
+      WITH limite AS (
+        SELECT lg.limite_mensual AS limite_gastos
+        FROM limites_gastos lg
+        WHERE lg.entidad_id = $1
+          AND lg.entidad_tipo = $4
+          AND lg.activo = true
+        ORDER BY lg.vigente_desde DESC NULLS LAST, lg.updated_at DESC NULLS LAST, lg.created_at DESC
+        LIMIT 1
+      ),
+      gastos_periodo AS (
+        SELECT COALESCE(SUM(g.monto), 0) AS gastos_acumulados
+        FROM gastos g
+        WHERE g.${campo_id} = $1
+          AND g.fecha >= $2
+          AND g.fecha <= $3
+          AND g.tipo_gasto = $4
+      )
+      SELECT
+        l.limite_gastos,
+        gp.gastos_acumulados,
+        l.limite_gastos - gp.gastos_acumulados AS disponible
+      FROM limite l
+      CROSS JOIN gastos_periodo gp
+      WHERE l.limite_gastos IS NOT NULL
     `, [entidad_id, fecha_inicio, fecha_fin, entidad_tipo]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'No se encontró configuración de límite' });
     }
 
+    const limiteGastos = parseFloat(result.rows[0].limite_gastos);
+    const gastosAcumulados = parseFloat(result.rows[0].gastos_acumulados);
+    const disponiblePorLimite = parseFloat(result.rows[0].disponible);
+
+    // Calcular disponible real por resguardo.
+    let disponiblePorResguardo = 0;
+    if (entidad_tipo === 'estacion') {
+      const resguardoEstacionResult = await pool.query(
+        `SELECT
+          COALESCE(SUM(rp.merma_importe), 0) AS merma_generada,
+          COALESCE(
+            (
+              SELECT SUM(e.monto)
+              FROM entregas e
+              WHERE e.estacion_id = $1
+                AND e.tipo_entrega = 'estacion_zona'
+                AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                AND e.fecha >= $2
+                AND e.fecha <= $3
+            ),
+            0
+          ) AS entregas_realizadas
+         FROM reportes r
+         JOIN reporte_productos rp ON rp.reporte_id = r.id
+         WHERE r.estacion_id = $1
+           AND r.fecha >= $2
+           AND r.fecha <= $3
+           AND r.estado = 'Aprobado'`,
+        [entidad_id, fecha_inicio, fecha_fin]
+      );
+
+      const mermaGenerada = parseFloat(resguardoEstacionResult.rows[0]?.merma_generada || '0');
+      const entregasRealizadas = parseFloat(resguardoEstacionResult.rows[0]?.entregas_realizadas || '0');
+      disponiblePorResguardo = mermaGenerada - entregasRealizadas - gastosAcumulados;
+    } else {
+      const resguardoZonaResult = await pool.query(
+        `SELECT
+          COALESCE(
+            (
+              SELECT SUM(e.monto)
+              FROM entregas e
+              WHERE e.zona_id = $1
+                AND e.tipo_entrega = 'estacion_zona'
+                AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                AND e.fecha >= $2
+                AND e.fecha <= $3
+            ),
+            0
+          ) AS entregas_recibidas,
+          COALESCE(
+            (
+              SELECT SUM(e.monto)
+              FROM entregas e
+              WHERE e.zona_origen_id = $1
+                AND e.tipo_entrega = 'zona_direccion'
+                AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                AND e.fecha >= $2
+                AND e.fecha <= $3
+            ),
+            0
+          ) AS entregas_enviadas`,
+        [entidad_id, fecha_inicio, fecha_fin]
+      );
+
+      const entregasRecibidas = parseFloat(resguardoZonaResult.rows[0]?.entregas_recibidas || '0');
+      const entregasEnviadas = parseFloat(resguardoZonaResult.rows[0]?.entregas_enviadas || '0');
+      disponiblePorResguardo = entregasRecibidas - entregasEnviadas - gastosAcumulados;
+    }
+
+    const disponibleEfectivo = Math.max(0, Math.min(disponiblePorLimite, disponiblePorResguardo));
+
     return res.json({
-      limite_gastos: parseFloat(result.rows[0].limite_gastos),
-      gastos_acumulados: parseFloat(result.rows[0].gastos_acumulados),
-      disponible: parseFloat(result.rows[0].disponible),
+      limite_gastos: limiteGastos,
+      gastos_acumulados: gastosAcumulados,
+      disponible_por_limite: Math.max(0, disponiblePorLimite),
+      disponible_por_resguardo: Math.max(0, disponiblePorResguardo),
+      disponible: disponibleEfectivo,
       periodo: { mes: mesNum, anio: anioNum }
     });
   } catch (error) {

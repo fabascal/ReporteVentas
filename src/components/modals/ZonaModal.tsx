@@ -17,6 +17,7 @@ export default function ZonaModal({
   const [formData, setFormData] = useState({
     nombre: zona?.nombre || '',
     activa: zona?.activa !== undefined ? zona.activa : true,
+    orden_reporte: zona?.orden_reporte ?? 99,
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -55,6 +56,29 @@ export default function ZonaModal({
               required
               placeholder="Ej: Zona Norte"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
+              Orden de Reporte *
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={formData.orden_reporte}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  orden_reporte: Math.max(1, Number.parseInt(e.target.value || '1', 10) || 1),
+                })
+              }
+              className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+              required
+              placeholder="Ej: 1"
+            />
+            <p className="mt-1 text-xs text-[#617589] dark:text-slate-400">
+              Menor número = mayor prioridad en reportes.
+            </p>
           </div>
 
           {zona && (

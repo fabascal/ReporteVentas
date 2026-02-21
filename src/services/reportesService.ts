@@ -165,6 +165,126 @@ export interface PaginatedResponse<T> {
   }
 }
 
+export interface ReporteERZonaResponse {
+  periodo: {
+    mes: number
+    anio: number
+  }
+  zona: {
+    id: string
+    nombre: string
+  }
+  productos: Array<{
+    id: string
+    tipo_producto: string
+    nombre_display: string
+  }>
+  filas: Array<{
+    estacion_id: string
+    estacion_nombre: string
+    valores: Record<string, number>
+  }>
+}
+
+export interface ReporteRGeneralResponse {
+  periodo: {
+    mes: number
+    anio: number
+  }
+  producto: 'premium' | 'magna' | 'diesel' | string
+  zonas: Array<{
+    zona_id: string
+    zona_nombre: string
+    zona_orden?: number
+    estaciones: Array<{
+      estacion_id: string
+      estacion_nombre: string
+      iib: number
+      c: number
+      lts: number
+      it: number
+      iffb: number
+      ee: number
+      d: number
+      er: number
+      vc: number
+      er_porcentaje: number
+      ee_porcentaje: number
+    }>
+  }>
+}
+
+export interface ReporteConciliacionMensualResponse {
+  periodo: {
+    mes: number
+    anio: number
+  }
+  productos: Array<{
+    id: string
+    tipo_producto: string
+    nombre_display: string
+  }>
+  total_zonas: number
+  zonas: Array<{
+    zona_id: string
+    zona_nombre: string
+    zona_orden?: number
+    total_merma_zona: number
+    total_entregas_zona: number
+    diferencia_zona: number
+    total_estaciones: number
+    estaciones: Array<{
+      estacion_id: string
+      identificador_externo?: string
+      nombre: string
+      productos: Record<string, { merma_volumen: number; precio: number; merma_monto: number }>
+      total_merma: number
+      total_entregas: number
+      diferencia: number
+    }>
+  }>
+}
+
+export interface ReporteLiquidacionesResponse {
+  periodo: { mes: number; anio: number }
+  resumen: {
+    total_zonas: number
+    total_merma: number
+    total_entregas: number
+    total_gastos: number
+    total_saldo_inicial: number
+    total_saldo_final: number
+    total_diferencia: number
+  }
+  zonas: Array<{
+    zona_id: string
+    zona_nombre: string
+    zona_orden?: number
+    liquidacion_id: string
+    merma_generada: number
+    entregas_realizadas: number
+    gastos_realizados: number
+    saldo_inicial: number
+    saldo_final: number
+    diferencia: number
+    fecha_cierre?: string
+    observaciones?: string | null
+    total_estaciones: number
+    estaciones: Array<{
+      estacion_id: string
+      estacion_nombre: string
+      identificador_externo?: string
+      merma_generada: number
+      entregas_realizadas: number
+      gastos_realizados: number
+      saldo_inicial: number
+      saldo_final: number
+      diferencia: number
+      fecha_cierre?: string
+    }>
+  }>
+}
+
 export const reportesService = {
   async getReportes(
     page: number = 1, 
@@ -231,9 +351,46 @@ export const reportesService = {
   },
 
   async obtenerDatosAPI(estacionId: string, fecha: string): Promise<{
-    premium?: { precio: number; litros: number; importe: number; mermaVolumen: number; mermaImporte: number; mermaPorcentaje: number }
-    magna?: { precio: number; litros: number; importe: number; mermaVolumen: number; mermaImporte: number; mermaPorcentaje: number }
-    diesel?: { precio: number; litros: number; importe: number; mermaVolumen: number; mermaImporte: number; mermaPorcentaje: number }
+    aceites?: number
+    premium?: {
+      precio: number
+      litros: number
+      importe: number
+      adminVolumen: number
+      adminImporte: number
+      mermaVolumen: number
+      mermaImporte: number
+      mermaPorcentaje: number
+      iib: number
+      compras: number
+      iffb: number
+    }
+    magna?: {
+      precio: number
+      litros: number
+      importe: number
+      adminVolumen: number
+      adminImporte: number
+      mermaVolumen: number
+      mermaImporte: number
+      mermaPorcentaje: number
+      iib: number
+      compras: number
+      iffb: number
+    }
+    diesel?: {
+      precio: number
+      litros: number
+      importe: number
+      adminVolumen: number
+      adminImporte: number
+      mermaVolumen: number
+      mermaImporte: number
+      mermaPorcentaje: number
+      iib: number
+      compras: number
+      iffb: number
+    }
   }> {
     const response = await api.post('/reportes/obtener-datos-api', { estacionId, fecha })
     return response.data
@@ -351,6 +508,49 @@ export const reportesService = {
       console.error('Error al obtener reporte de ventas:', error)
       throw error
     }
+  },
+
+  // Obtener reporte ER por zona
+  getReporteERPorZona: async (
+    mes: string,
+    anio: string,
+    zonaId: string
+  ): Promise<ReporteERZonaResponse> => {
+    const response = await api.get<ReporteERZonaResponse>('/reportes/er/zona', {
+      params: { mes, anio, zonaId },
+    })
+    return response.data
+  },
+
+  getReporteRGeneral: async (
+    mes: string,
+    anio: string,
+    producto: 'premium' | 'magna' | 'diesel'
+  ): Promise<ReporteRGeneralResponse> => {
+    const response = await api.get<ReporteRGeneralResponse>('/reportes/r/general', {
+      params: { mes, anio, producto },
+    })
+    return response.data
+  },
+
+  getReporteConciliacionMensual: async (
+    mes: string,
+    anio: string
+  ): Promise<ReporteConciliacionMensualResponse> => {
+    const response = await api.get<ReporteConciliacionMensualResponse>('/reportes/conciliacion-mensual', {
+      params: { mes, anio },
+    })
+    return response.data
+  },
+
+  getReporteLiquidaciones: async (
+    mes: string,
+    anio: string
+  ): Promise<ReporteLiquidacionesResponse> => {
+    const response = await api.get<ReporteLiquidacionesResponse>('/reportes/liquidaciones', {
+      params: { mes, anio },
+    })
+    return response.data
   },
 
   // Exportar reporte de ventas a Excel

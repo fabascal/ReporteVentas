@@ -4,10 +4,12 @@ import { useAuth } from '../contexts/AuthContext'
 import AdminHeader from '../components/AdminHeader'
 import { configuracionService } from '../services/configuracionService'
 import { menusService, MenuItem, CreateMenuData, UpdateMenuData } from '../services/menusService'
-import { Role } from '../types/auth'
+import { rolesService } from '../services/rolesService'
 import VistaUsuarios from '../components/views/VistaUsuarios'
 import VistaZonasEstaciones from '../components/views/VistaZonasEstaciones'
 import VistaProductos from '../components/views/VistaProductos'
+import VistaRoles from '../components/views/VistaRoles'
+import { sileo } from 'sileo'
 
 export default function AdminConfiguracion() {
   const { user } = useAuth()
@@ -41,6 +43,15 @@ export default function AdminConfiguracion() {
     autoAprobacion: false,
   })
 
+  const [backupConfig, setBackupConfig] = useState({
+    enabled: false,
+    frequency: 'diario' as 'diario' | 'semanal' | 'mensual',
+    time: '00:00',
+    retentionDays: 7,
+    weeklyDay: 1,
+    monthlyDay: 1,
+  })
+
   const [apiConfig, setApiConfig] = useState({
     apiUsuario: '',
     apiContrasena: '',
@@ -54,13 +65,16 @@ export default function AdminConfiguracion() {
   const [isSaving, setIsSaving] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isSincronizando, setIsSincronizando] = useState(false)
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false)
+  const [isRestoringBackup, setIsRestoringBackup] = useState(false)
+  const [deletingBackupFile, setDeletingBackupFile] = useState<string | null>(null)
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [testMessage, setTestMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [syncDetalles, setSyncDetalles] = useState<string[]>([])
   const [showSyncDetalles, setShowSyncDetalles] = useState(false)
   
   // Estado para gestión de menús
-  const [selectedRole, setSelectedRole] = useState<Role | null>(null)
+  const [selectedRole, setSelectedRole] = useState<string | null>(null)
   const [menuEditando, setMenuEditando] = useState<MenuItem | null>(null)
   const [mostrarFormularioMenu, setMostrarFormularioMenu] = useState(false)
   const queryClient = useQueryClient()
@@ -69,6 +83,18 @@ export default function AdminConfiguracion() {
   const { data: menus = [], isLoading: isLoadingMenus } = useQuery({
     queryKey: ['menus'],
     queryFn: () => menusService.getMenus(),
+  })
+  const { data: roles = [] } = useQuery({
+    queryKey: ['roles'],
+    queryFn: rolesService.getRoles,
+  })
+  const { data: backupSettings } = useQuery({
+    queryKey: ['backup-settings'],
+    queryFn: configuracionService.getBackupSettings,
+  })
+  const { data: backupFiles = [], isLoading: isLoadingBackups } = useQuery({
+    queryKey: ['backups-list'],
+    queryFn: configuracionService.listBackups,
   })
 
   // Filtrar menús según el rol seleccionado
@@ -149,8 +175,40 @@ export default function AdminConfiguracion() {
   }
 
   // Estado para tabs de configuración
-  type ConfigTab = 'menus' | 'usuarios' | 'zonas' | 'productos' | 'general' | 'notificaciones' | 'seguridad' | 'api' | 'sincronizacion' | 'reportes'
-  const [activeTab, setActiveTab] = useState<ConfigTab>('menus')
+  type ConfigTab =
+    | 'menus'
+    | 'roles'
+    | 'usuarios'
+    | 'zonas'
+    | 'productos'
+    | 'general'
+    | 'notificaciones'
+    | 'seguridad'
+    | 'api'
+    | 'sincronizacion'
+    | 'reportes'
+    | 'backups'
+  const [activeTab, setActiveTab] = useState<ConfigTab>(() => {
+    const savedTab = localStorage.getItem('admin_config_active_tab')
+    const validTabs: ConfigTab[] = [
+      'menus',
+      'roles',
+      'usuarios',
+      'zonas',
+      'productos',
+      'general',
+      'notificaciones',
+      'seguridad',
+      'api',
+      'sincronizacion',
+      'reportes',
+      'backups',
+    ]
+    if (savedTab && validTabs.includes(savedTab as ConfigTab)) {
+      return savedTab as ConfigTab
+    }
+    return 'menus'
+  })
 
   // Cargar configuración de API al montar el componente
   useEffect(() => {
@@ -168,6 +226,22 @@ export default function AdminConfiguracion() {
 
     cargarConfiguracionAPI()
   }, [])
+
+  useEffect(() => {
+    if (!backupSettings) return
+    setBackupConfig({
+      enabled: backupSettings.enabled,
+      frequency: backupSettings.frequency,
+      time: backupSettings.time,
+      retentionDays: backupSettings.retentionDays,
+      weeklyDay: backupSettings.weeklyDay,
+      monthlyDay: backupSettings.monthlyDay,
+    })
+  }, [backupSettings])
+
+  useEffect(() => {
+    localStorage.setItem('admin_config_active_tab', activeTab)
+  }, [activeTab])
 
   const handleSave = async (section: string) => {
     setIsSaving(true)
@@ -312,6 +386,117 @@ export default function AdminConfiguracion() {
     }
   }
 
+  const handleGuardarBackups = async () => {
+    try {
+      setIsSaving(true)
+      setSaveMessage(null)
+      await configuracionService.updateBackupSettings(backupConfig)
+      await queryClient.invalidateQueries({ queryKey: ['backup-settings'] })
+      setSaveMessage({ type: 'success', text: 'Configuración de respaldos guardada exitosamente' })
+      setTimeout(() => setSaveMessage(null), 4000)
+    } catch (error: any) {
+      setSaveMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Error al guardar configuración de respaldos',
+      })
+      setTimeout(() => setSaveMessage(null), 5000)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleRespaldoManual = async () => {
+    try {
+      setIsCreatingBackup(true)
+      setSaveMessage(null)
+      const result = await configuracionService.createManualBackup()
+      await queryClient.invalidateQueries({ queryKey: ['backups-list'] })
+      setSaveMessage({ type: 'success', text: result.message || 'Respaldo manual generado' })
+      setTimeout(() => setSaveMessage(null), 4000)
+    } catch (error: any) {
+      setSaveMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Error al generar respaldo manual',
+      })
+      setTimeout(() => setSaveMessage(null), 5000)
+    } finally {
+      setIsCreatingBackup(false)
+    }
+  }
+
+  const handleDescargarRespaldo = async (fileName: string) => {
+    try {
+      const blob = await configuracionService.downloadBackup(fileName)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (error: any) {
+      setSaveMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'No se pudo descargar el respaldo',
+      })
+      setTimeout(() => setSaveMessage(null), 5000)
+    }
+  }
+
+  const handleRestaurarRespaldo = async (fileName: string) => {
+    const ok = window.confirm(
+      `Vas a restaurar el respaldo "${fileName}". Esta acción reemplaza la base actual. ¿Deseas continuar?`
+    )
+    if (!ok) return
+
+    try {
+      setIsRestoringBackup(true)
+      setSaveMessage(null)
+      const result = await configuracionService.restoreBackup(fileName)
+      setSaveMessage({
+        type: 'success',
+        text: result.message || 'Respaldo restaurado exitosamente',
+      })
+      setTimeout(() => setSaveMessage(null), 7000)
+    } catch (error: any) {
+      setSaveMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Error al restaurar respaldo',
+      })
+      setTimeout(() => setSaveMessage(null), 7000)
+    } finally {
+      setIsRestoringBackup(false)
+    }
+  }
+
+  const handleEliminarRespaldo = async (fileName: string) => {
+    const ok = window.confirm(
+      `Vas a eliminar el respaldo "${fileName}". Esta acción no se puede deshacer. ¿Deseas continuar?`
+    )
+    if (!ok) return
+
+    try {
+      setDeletingBackupFile(fileName)
+      setSaveMessage(null)
+      const result = await configuracionService.deleteBackup(fileName)
+      await queryClient.invalidateQueries({ queryKey: ['backups-list'] })
+      setSaveMessage({
+        type: 'success',
+        text: result.message || 'Respaldo eliminado exitosamente',
+      })
+      setTimeout(() => setSaveMessage(null), 5000)
+    } catch (error: any) {
+      setSaveMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'No se pudo eliminar el respaldo',
+      })
+      setTimeout(() => setSaveMessage(null), 7000)
+    } finally {
+      setDeletingBackupFile(null)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#f6f7f8] dark:bg-[#101922] font-display antialiased transition-colors duration-200">
       <AdminHeader title="Configuración del Sistema" icon="settings" />
@@ -371,6 +556,17 @@ export default function AdminConfiguracion() {
             >
               <span className="material-symbols-outlined text-lg align-middle mr-2">people</span>
               Usuarios
+            </button>
+            <button
+              onClick={() => setActiveTab('roles')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'roles'
+                  ? 'border-[#1173d4] text-[#1173d4] dark:text-blue-400'
+                  : 'border-transparent text-[#617589] dark:text-slate-400 hover:text-[#111418] dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <span className="material-symbols-outlined text-lg align-middle mr-2">shield_person</span>
+              Roles
             </button>
             <button
               onClick={() => setActiveTab('zonas')}
@@ -460,6 +656,17 @@ export default function AdminConfiguracion() {
               <span className="material-symbols-outlined text-lg align-middle mr-2">description</span>
               Reportes
             </button>
+            <button
+              onClick={() => setActiveTab('backups')}
+              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === 'backups'
+                  ? 'border-[#1173d4] text-[#1173d4] dark:text-blue-400'
+                  : 'border-transparent text-[#617589] dark:text-slate-400 hover:text-[#111418] dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-600'
+              }`}
+            >
+              <span className="material-symbols-outlined text-lg align-middle mr-2">backup</span>
+              Respaldos
+            </button>
           </nav>
         </div>
 
@@ -467,6 +674,9 @@ export default function AdminConfiguracion() {
         <div className="space-y-6">
           {/* Tab: Usuarios */}
           {activeTab === 'usuarios' && <VistaUsuarios />}
+
+          {/* Tab: Roles */}
+          {activeTab === 'roles' && <VistaRoles />}
 
           {/* Tab: Zonas y Estaciones */}
           {activeTab === 'zonas' && <VistaZonasEstaciones />}
@@ -497,14 +707,15 @@ export default function AdminConfiguracion() {
                 </label>
                 <select
                   value={selectedRole || 'all'}
-                  onChange={(e) => setSelectedRole(e.target.value === 'all' ? null : (e.target.value as Role))}
+                  onChange={(e) => setSelectedRole(e.target.value === 'all' ? null : e.target.value)}
                   className="w-full md:w-auto px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
                 >
                   <option value="all">Todos los roles</option>
-                  <option value={Role.Administrador}>Administrador</option>
-                  <option value={Role.GerenteEstacion}>Gerente de Estación</option>
-                  <option value={Role.GerenteZona}>Gerente de Zona</option>
-                  <option value={Role.Direccion}>Director</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.codigo}>
+                      {role.nombre}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1307,10 +1518,269 @@ export default function AdminConfiguracion() {
           </div>
           )}
 
+          {/* Tab: Respaldos */}
+          {activeTab === 'backups' && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-900/30 p-2 text-blue-600 dark:text-blue-400">
+                    <span className="material-symbols-outlined text-2xl">schedule</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#111418] dark:text-white">Programación Automática</h3>
+                    <p className="text-sm text-[#617589] dark:text-slate-400">Define frecuencia, hora y retención de respaldos</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="flex items-center justify-between p-4 rounded-lg border border-[#e6e8eb] dark:border-slate-700">
+                  <div>
+                    <p className="font-semibold text-[#111418] dark:text-white">Respaldo Automático</p>
+                    <p className="text-sm text-[#617589] dark:text-slate-400">Activa ejecución automática por horario</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={backupConfig.enabled}
+                    onChange={(e) => setBackupConfig({ ...backupConfig, enabled: e.target.checked })}
+                    className="size-5 rounded border-[#dbe0e6] dark:border-slate-600 text-[#1173d4] focus:ring-2 focus:ring-[#1173d4]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
+                    Frecuencia
+                  </label>
+                  <select
+                    value={backupConfig.frequency}
+                    onChange={(e) => setBackupConfig({
+                      ...backupConfig,
+                      frequency: e.target.value as 'diario' | 'semanal' | 'mensual',
+                    })}
+                    className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+                  >
+                    <option value="diario">Diario</option>
+                    <option value="semanal">Semanal</option>
+                    <option value="mensual">Mensual</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
+                    Hora de ejecución
+                  </label>
+                  <input
+                    type="time"
+                    value={backupConfig.time}
+                    onChange={(e) => setBackupConfig({ ...backupConfig, time: e.target.value })}
+                    className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
+                    Retención (días)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="3650"
+                    value={backupConfig.retentionDays}
+                    onChange={(e) => setBackupConfig({
+                      ...backupConfig,
+                      retentionDays: parseInt(e.target.value, 10) || 7,
+                    })}
+                    className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+                  />
+                </div>
+
+                {backupConfig.frequency === 'semanal' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
+                      Día de semana
+                    </label>
+                    <select
+                      value={backupConfig.weeklyDay}
+                      onChange={(e) => setBackupConfig({
+                        ...backupConfig,
+                        weeklyDay: parseInt(e.target.value, 10),
+                      })}
+                      className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+                    >
+                      <option value={0}>Domingo</option>
+                      <option value={1}>Lunes</option>
+                      <option value={2}>Martes</option>
+                      <option value={3}>Miércoles</option>
+                      <option value={4}>Jueves</option>
+                      <option value={5}>Viernes</option>
+                      <option value={6}>Sábado</option>
+                    </select>
+                  </div>
+                )}
+
+                {backupConfig.frequency === 'mensual' && (
+                  <div>
+                    <label className="block text-sm font-semibold text-[#111418] dark:text-gray-200 mb-2">
+                      Día del mes
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="28"
+                      value={backupConfig.monthlyDay}
+                      onChange={(e) => setBackupConfig({
+                        ...backupConfig,
+                        monthlyDay: parseInt(e.target.value, 10) || 1,
+                      })}
+                      className="w-full px-4 py-2 border border-[#dbe0e6] dark:border-slate-600 rounded-lg bg-white dark:bg-[#101922] text-[#111418] dark:text-white focus:ring-2 focus:ring-[#1173d4] focus:border-transparent"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-[#e6e8eb] dark:border-slate-700">
+                <button
+                  type="button"
+                  onClick={handleGuardarBackups}
+                  disabled={isSaving}
+                  className="px-5 py-2.5 bg-[#1173d4] text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSaving ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin">sync</span>
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined">save</span>
+                      <span>Guardar Configuración</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#e6e8eb] dark:border-slate-700 bg-white dark:bg-[#1a2632] p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-lg bg-green-50 dark:bg-green-900/30 p-2 text-green-600 dark:text-green-400">
+                    <span className="material-symbols-outlined text-2xl">archive</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-[#111418] dark:text-white">Respaldo bajo demanda</h3>
+                    <p className="text-sm text-[#617589] dark:text-slate-400">Genera, descarga y restaura respaldos</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ['backups-list'] })}
+                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">refresh</span>
+                    Actualizar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleRespaldoManual}
+                    disabled={isCreatingBackup || isRestoringBackup || !!deletingBackupFile}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isCreatingBackup ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin">sync</span>
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined">add</span>
+                        Crear Respaldo Ahora
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {isLoadingBackups ? (
+                <div className="text-center py-8 text-[#617589] dark:text-slate-400">
+                  <span className="material-symbols-outlined text-4xl mb-2 animate-spin">sync</span>
+                  <p>Cargando respaldos...</p>
+                </div>
+              ) : backupFiles.length === 0 ? (
+                <div className="text-center py-8 text-[#617589] dark:text-slate-400">
+                  <span className="material-symbols-outlined text-4xl mb-2">archive</span>
+                  <p>No hay respaldos disponibles</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-[#e6e8eb] dark:border-slate-700">
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#111418] dark:text-white">Archivo</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#111418] dark:text-white">Tipo</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#111418] dark:text-white">Fecha</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#111418] dark:text-white">Tamaño</th>
+                        <th className="text-left py-3 px-4 text-sm font-semibold text-[#111418] dark:text-white">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {backupFiles.map((backup) => (
+                        <tr
+                          key={backup.fileName}
+                          className="border-b border-[#e6e8eb] dark:border-slate-700 hover:bg-[#f6f7f8] dark:hover:bg-[#253240] transition-colors"
+                        >
+                          <td className="py-3 px-4 text-sm text-[#111418] dark:text-white font-mono">{backup.fileName}</td>
+                          <td className="py-3 px-4 text-sm text-[#111418] dark:text-white capitalize">{backup.source}</td>
+                          <td className="py-3 px-4 text-sm text-[#617589] dark:text-slate-400">
+                            {new Date(backup.createdAt).toLocaleString('es-MX')}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-[#617589] dark:text-slate-400">
+                            {(backup.sizeBytes / 1024 / 1024).toFixed(2)} MB
+                          </td>
+                          <td className="py-3 px-4 text-sm">
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleDescargarRespaldo(backup.fileName)}
+                                disabled={!!deletingBackupFile}
+                                className="px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-xs disabled:opacity-50"
+                              >
+                                Descargar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRestaurarRespaldo(backup.fileName)}
+                                disabled={isRestoringBackup || !!deletingBackupFile}
+                                className="px-3 py-1.5 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors text-xs disabled:opacity-50"
+                              >
+                                {isRestoringBackup ? 'Restaurando...' : 'Restaurar'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleEliminarRespaldo(backup.fileName)}
+                                disabled={isRestoringBackup || deletingBackupFile === backup.fileName}
+                                className="px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors text-xs disabled:opacity-50"
+                              >
+                                {deletingBackupFile === backup.fileName ? 'Eliminando...' : 'Eliminar'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+          )}
+
           {/* Modal de Formulario de Menú */}
           {mostrarFormularioMenu && (
             <FormularioMenu
               menu={menuEditando}
+              availableRoles={roles.map((role) => role.codigo)}
               onSave={(data) => {
                 if (menuEditando) {
                   updateMenuMutation.mutate({ id: menuEditando.id, data })
@@ -1331,14 +1801,19 @@ export default function AdminConfiguracion() {
 // Componente FormularioMenu
 interface FormularioMenuProps {
   menu: MenuItem | null
+  availableRoles: string[]
   onSave: (data: CreateMenuData | UpdateMenuData) => void
   onCancel: () => void
   isLoading: boolean
 }
 
-function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuProps) {
+function FormularioMenu({ menu, availableRoles, onSave, onCancel, isLoading }: FormularioMenuProps) {
   // Debug: ver qué datos recibe el formulario
   console.log('FormularioMenu - menu recibido:', menu)
+  const roleOptions =
+    availableRoles.length > 0
+      ? availableRoles
+      : ['Administrador', 'GerenteEstacion', 'GerenteZona', 'Direccion']
   const iconOptions = [
     'dashboard',
     'description',
@@ -1374,7 +1849,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'dashboard',
         orden: 1,
         requiere_exact_match: true,
-        roles: [Role.Administrador],
+        roles: ['Administrador'],
       },
     },
     {
@@ -1388,7 +1863,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'dashboard',
         orden: 0,
         requiere_exact_match: false,
-        roles: [Role.GerenteEstacion],
+        roles: ['GerenteEstacion'],
       },
     },
     {
@@ -1402,7 +1877,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'dashboard',
         orden: 1,
         requiere_exact_match: false,
-        roles: [Role.GerenteZona],
+        roles: ['GerenteZona'],
       },
     },
     {
@@ -1416,7 +1891,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'dashboard',
         orden: 1,
         requiere_exact_match: false,
-        roles: [Role.Direccion],
+        roles: ['Direccion'],
       },
     },
     {
@@ -1430,7 +1905,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'add',
         orden: 2,
         requiere_exact_match: false,
-        roles: [Role.GerenteEstacion],
+        roles: ['GerenteEstacion'],
       },
     },
     {
@@ -1444,7 +1919,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'history',
         orden: 3,
         requiere_exact_match: false,
-        roles: [Role.GerenteEstacion],
+        roles: ['GerenteEstacion'],
       },
     },
     {
@@ -1458,7 +1933,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'history',
         orden: 3,
         requiere_exact_match: false,
-        roles: [Role.GerenteZona],
+        roles: ['GerenteZona'],
       },
     },
     {
@@ -1472,7 +1947,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'settings',
         orden: 5,
         requiere_exact_match: false,
-        roles: [Role.Administrador],
+        roles: ['Administrador'],
       },
     },
     {
@@ -1486,7 +1961,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'bar_chart',
         orden: 20,
         requiere_exact_match: false,
-        roles: [Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion],
+        roles: ['Administrador', 'GerenteEstacion', 'GerenteZona', 'Direccion'],
       },
     },
     {
@@ -1500,7 +1975,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
         icon: 'monitoring',
         orden: 21,
         requiere_exact_match: false,
-        roles: [Role.Administrador, Role.GerenteEstacion, Role.GerenteZona, Role.Direccion],
+        roles: ['Administrador', 'GerenteEstacion', 'GerenteZona', 'Direccion'],
       },
     },
   ]
@@ -1556,23 +2031,23 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.menu_id || !formData.label || !formData.icon || formData.roles.length === 0) {
-      alert('Por favor completa todos los campos requeridos')
+      sileo.error({ title: 'Por favor completa todos los campos requeridos' })
       return
     }
     if (formData.tipo === 'route' && !formData.path) {
-      alert('El tipo "route" requiere un path')
+      sileo.error({ title: 'El tipo "route" requiere un path' })
       return
     }
     if (formData.tipo === 'route' && formData.path && !formData.path.startsWith('/')) {
-      alert('El path debe iniciar con "/" (ej: /admin/reportes)')
+      sileo.error({ title: 'El path debe iniciar con "/" (ej: /admin/reportes)' })
       return
     }
     if (formData.tipo === 'view' && !formData.view_id) {
-      alert('El tipo "view" requiere un view_id')
+      sileo.error({ title: 'El tipo "view" requiere un view_id' })
       return
     }
     if (formData.tipo === 'view' && formData.view_id && !/^[a-zA-Z0-9_-]+$/.test(formData.view_id)) {
-      alert('El view_id solo debe contener letras, números, guion o guion bajo')
+      sileo.error({ title: 'El view_id solo debe contener letras, números, guion o guion bajo' })
       return
     }
     // Limpiar campos que no corresponden al tipo
@@ -1584,7 +2059,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
     onSave(dataToSave)
   }
 
-  const toggleRole = (role: Role) => {
+  const toggleRole = (role: string) => {
     setFormData((prev) => ({
       ...prev,
       roles: prev.roles.includes(role)
@@ -1823,7 +2298,7 @@ function FormularioMenu({ menu, onSave, onCancel, isLoading }: FormularioMenuPro
               Roles * (selecciona al menos uno)
             </label>
             <div className="space-y-2">
-              {Object.values(Role).map((role) => (
+              {roleOptions.map((role) => (
                 <label key={role} className="flex items-center gap-2">
                   <input
                     type="checkbox"

@@ -21,6 +21,7 @@ api.interceptors.request.use((config) => {
 export interface Zona {
   id: string
   nombre: string
+  orden_reporte?: number
   activa: boolean
   created_at: string
   total_estaciones?: number
@@ -43,11 +44,14 @@ export interface Estacion {
 
 export interface CreateZonaData {
   nombre: string
+  activa?: boolean
+  orden_reporte?: number
 }
 
 export interface UpdateZonaData {
   nombre: string
   activa?: boolean
+  orden_reporte?: number
 }
 
 export interface CreateEstacionData {

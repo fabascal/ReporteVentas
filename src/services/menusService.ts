@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { Role } from '../types/auth'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -31,7 +30,7 @@ export interface MenuItem {
   orden: number
   requiere_exact_match: boolean
   activo: boolean
-  roles: Role[]
+  roles: string[]
   created_at?: string
   updated_at?: string
 }
@@ -45,7 +44,7 @@ export interface CreateMenuData {
   icon: string
   orden?: number
   requiere_exact_match?: boolean
-  roles: Role[]
+  roles: string[]
 }
 
 export interface UpdateMenuData {
@@ -58,7 +57,7 @@ export interface UpdateMenuData {
   orden?: number
   requiere_exact_match?: boolean
   activo?: boolean
-  roles?: Role[]
+  roles?: string[]
 }
 
 export const menusService = {
@@ -69,7 +68,7 @@ export const menusService = {
   },
 
   // Obtener menús por rol (público para usuarios autenticados)
-  async getMenusByRole(role: Role): Promise<MenuItem[]> {
+  async getMenusByRole(role: string): Promise<MenuItem[]> {
     const response = await api.get<MenuItem[]>(`/menus/by-role/${role}`)
     return response.data
   },

@@ -4,10 +4,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { reportesService } from '../services/reportesService'
 import { ReporteVentas, EstadoReporte, ProductoCatalogo } from '../types/reportes'
 import { Role } from '../types/auth'
+import { sileo } from 'sileo'
 import GerenteEstacionHeader from '../components/GerenteEstacionHeader'
 import GerenteZonaHeader from '../components/GerenteZonaHeader'
 import { useEjerciciosActivos } from '../hooks/useEjerciciosActivos'
-import toast from 'react-hot-toast'
 
 interface DiaReporte {
   dia: number
@@ -42,8 +42,7 @@ export default function ReporteRevisionMensual() {
   
   // Helper para determinar si un campo es editable
   const esEditable = (reporteId: string, estado: string) => {
-    return (isGerenteEstacion && estado === EstadoReporte.Pendiente) || 
-           (isGerenteZona && reporteEnCorreccion === reporteId)
+    return false
   }
   
   const [estacionId, setEstacionId] = useState('')
@@ -261,10 +260,13 @@ export default function ReporteRevisionMensual() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
       await refetch()
-      toast.success('Estado actualizado correctamente')
+      sileo.success({ title: 'Estado actualizado correctamente' })
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al actualizar estado')
+      sileo.error({
+        title: 'No se pudo actualizar el estado',
+        description: error.response?.data?.message || 'Error al actualizar estado',
+      })
     }
   })
 
@@ -276,10 +278,13 @@ export default function ReporteRevisionMensual() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
       await refetch()
-      toast.success('Reporte actualizado correctamente')
+      sileo.success({ title: 'Reporte actualizado correctamente' })
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al actualizar reporte')
+      sileo.error({
+        title: 'No se pudo actualizar el reporte',
+        description: error.response?.data?.message || 'Error al actualizar reporte',
+      })
     }
   })
 
@@ -291,14 +296,16 @@ export default function ReporteRevisionMensual() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['reportes-mes'] })
       await refetch()
-      toast.success('Reporte creado correctamente')
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al crear reporte')
     }
   })
 
   const handleConsultar = () => {
+    // Evita mostrar valores editados/stale de consultas anteriores
+    setExpandedRows({})
+    setEditValues({})
+    setAceitesInputValue({})
+    setFieldInputValues({})
+    setReporteEnCorreccion(null)
     setHasConsulted(true)
     refetch()
   }
@@ -346,13 +353,13 @@ export default function ReporteRevisionMensual() {
 
   const formatNumber = (value: number | undefined): string => {
     if (value === undefined || value === null) return '0.00'
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(value)
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
   }
 
   const formatInputNumber = (value: string): string => {
     const num = parseFloat(value.replace(/,/g, ''))
     if (isNaN(num)) return ''
-    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 }).format(num)
+    return new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num)
   }
 
   const parseInputNumber = (value: string): number => {
@@ -488,7 +495,7 @@ export default function ReporteRevisionMensual() {
     // Buscar el reporte original para obtener todos los campos necesarios
     const reporteOriginal = reportes?.find(r => r.id === reporteId)
     if (!reporteOriginal) {
-      toast.error('No se encontró el reporte')
+      sileo.error({ title: 'No se encontró el reporte' })
       return
     }
 
@@ -550,7 +557,7 @@ export default function ReporteRevisionMensual() {
       
       await refetch()
       
-      toast.success('Cambios guardados correctamente')
+      sileo.success({ title: 'Cambios guardados correctamente' })
       
       // Si es Gerente de Zona y está corrigiendo, salir del modo de corrección
       if (isGerenteZona && reporteEnCorreccion) {
@@ -558,12 +565,12 @@ export default function ReporteRevisionMensual() {
       }
     } catch (error) {
       console.error('Error al guardar cambios:', error)
-      toast.error('Error al guardar cambios')
+      sileo.error({ title: 'Error al guardar cambios' })
     }
   }
 
   const aplicarCorreccionEnCascada = async (reporteIdInicial: string, valoresIniciales: any, reporteOriginal: ReporteVentas) => {
-    const toastId = toast.loading('Aplicando corrección en cascada...')
+    const toastId = sileo.info({ title: 'Aplicando corrección en cascada...', duration: null })
     
     console.log('[CASCADA] Iniciando corrección en cascada para reporte:', reporteIdInicial)
     console.log('[CASCADA] Valores iniciales:', valoresIniciales)
@@ -729,19 +736,22 @@ export default function ReporteRevisionMensual() {
       
       console.log('[CASCADA] Datos recargados exitosamente')
       console.log('[CASCADA] Corrección completada exitosamente')
-      toast.success(`Corrección aplicada en cascada a ${diasPosteriores.length} días posteriores`, { id: toastId })
+      sileo.dismiss(toastId)
+      sileo.success({ title: `Corrección aplicada en cascada a ${diasPosteriores.length} días posteriores` })
     } catch (error) {
       console.error('Error en corrección en cascada:', error)
-      toast.error('Error al aplicar corrección en cascada', { id: toastId })
+      sileo.dismiss(toastId)
+      sileo.error({ title: 'Error al aplicar corrección en cascada' })
       throw error
     }
   }
 
   const handleIniciarCorreccion = (reporteId: string) => {
     setReporteEnCorreccion(reporteId)
-    toast('Modo de corrección activado. Modifica los campos necesarios y guarda.', {
-      icon: 'ℹ️',
-      duration: 4000
+    sileo.action({
+      title: 'Modo de corrección activado',
+      description: 'Modifica los campos necesarios y guarda.',
+      duration: 4200,
     })
   }
 
@@ -757,9 +767,7 @@ export default function ReporteRevisionMensual() {
       setFieldInputValues({})
     }
     setReporteEnCorreccion(null)
-    toast('Corrección cancelada', {
-      icon: 'ℹ️'
-    })
+    sileo.info({ title: 'Corrección cancelada' })
   }
 
   // Verificar si todos los días anteriores están aprobados
@@ -787,10 +795,8 @@ export default function ReporteRevisionMensual() {
 
   const handleCrearReporte = async (fecha: string) => {
     if (!estacionId) return
-    
-    toast.loading('Creando reporte...')
-    
-    createReporteMutation.mutate({
+
+    const payload = {
       estacionId: estacionId,
       fecha: fecha,
       aceites: 0,
@@ -833,6 +839,12 @@ export default function ReporteRevisionMensual() {
         vDsc: 0,
         iffb: 0
       }
+    }
+
+    await sileo.promise(createReporteMutation.mutateAsync(payload), {
+      loading: { title: 'Creando reporte...' },
+      success: { title: 'Reporte creado correctamente' },
+      error: (error: any) => ({ title: error?.response?.data?.message || 'Error al crear reporte' }),
     })
   }
 
@@ -1135,16 +1147,25 @@ export default function ReporteRevisionMensual() {
                       Fecha
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                      1 LTS
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
                       1 E
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
                       E%
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                      2 LTS
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
                       2 E
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
                       E%
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
+                      3 LTS
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-bold text-[#617589] dark:text-slate-400 uppercase tracking-wider">
                       3 E
@@ -1166,7 +1187,7 @@ export default function ReporteRevisionMensual() {
                 <tbody className="divide-y divide-[#e6e8eb] dark:divide-slate-700">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={11} className="px-6 py-8 text-center">
+                      <td colSpan={14} className="px-6 py-8 text-center">
                         <div className="flex items-center justify-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#1173d4]"></div>
                           <span className="ml-3 text-[#617589]">Cargando reportes...</span>
@@ -1175,7 +1196,7 @@ export default function ReporteRevisionMensual() {
                     </tr>
                   ) : dias.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="px-6 py-8 text-center text-[#617589] dark:text-slate-400">
+                      <td colSpan={14} className="px-6 py-8 text-center text-[#617589] dark:text-slate-400">
                         No hay datos para mostrar
                       </td>
                     </tr>
@@ -1206,16 +1227,25 @@ export default function ReporteRevisionMensual() {
                             {dia.dia} {new Date(parseInt(año), parseInt(mes) - 1, dia.dia).toLocaleDateString('es-MX', { month: 'short' })}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
+                            {dia.reporte?.premium ? formatNumber(dia.reporte.premium.litros || 0) : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
                             {dia.reporte?.premium ? formatNumber(dia.reporte.premium.mermaVolumen || 0) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
                             {dia.reporte?.premium ? formatNumber(dia.reporte.premium.mermaPorcentaje || 0) + '%' : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
+                            {dia.reporte?.magna ? formatNumber(dia.reporte.magna.litros || 0) : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
                             {dia.reporte?.magna ? formatNumber(dia.reporte.magna.mermaVolumen || 0) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
                             {dia.reporte?.magna ? formatNumber(dia.reporte.magna.mermaPorcentaje || 0) + '%' : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
+                            {dia.reporte?.diesel ? formatNumber(dia.reporte.diesel.litros || 0) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
                             {dia.reporte?.diesel ? formatNumber(dia.reporte.diesel.mermaVolumen || 0) : '-'}
@@ -1225,34 +1255,7 @@ export default function ReporteRevisionMensual() {
                           </td>
                           <td className="px-4 py-3 text-right text-[#111418] dark:text-white">
                             {dia.reporte ? (
-                              // Editable si: Gerente Estación con reporte pendiente O Gerente Zona en modo corrección
-                              esEditable(dia.reporte.id, dia.reporte.estado) ? (
-                                aceitesInputValue[dia.reporte.id] !== undefined ? (
-                                  <input
-                                    type="text"
-                                    value={aceitesInputValue[dia.reporte.id]}
-                                    onChange={(e) => handleAceitesChange(dia.reporte!.id, e.target.value)}
-                                    onBlur={() => handleAceitesBlur(dia.reporte!.id)}
-                                    onFocus={(e) => e.target.select()}
-                                    className="w-24 px-2 py-1 text-right text-sm border border-[#dbe0e6] dark:border-slate-600 rounded bg-white dark:bg-[#1a2632] text-[#111418] dark:text-white focus:outline-none focus:ring-1 focus:ring-[#1173d4]"
-                                  />
-                                ) : (
-                                  <div
-                                    onClick={() => {
-                                      setAceitesInputValue(prev => ({
-                                        ...prev,
-                                        [dia.reporte!.id]: (editValues[dia.reporte!.id]?.aceites ?? dia.reporte!.aceites ?? 0).toString()
-                                      }))
-                                    }}
-                                    className="cursor-pointer px-2 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                                    title="Haz clic para editar"
-                                  >
-                                    ${formatNumber(editValues[dia.reporte.id]?.aceites ?? dia.reporte.aceites ?? 0)}
-                                  </div>
-                                )
-                              ) : (
-                                `$${formatNumber(dia.reporte.aceites)}`
-                              )
+                              `$${formatNumber(dia.reporte.aceites)}`
                             ) : '-'}
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-[#111418] dark:text-white">
@@ -1268,13 +1271,6 @@ export default function ReporteRevisionMensual() {
                               // Gerente de Estación: aprobar/rechazar reportes pendientes
                               isGerenteEstacion && dia.reporte.estado === EstadoReporte.Pendiente ? (
                                 <div className="flex items-center justify-center gap-2">
-                                  <button
-                                    onClick={() => handleGuardarCambios(dia.reporte!.id)}
-                                    className="flex items-center justify-center w-9 h-9 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm hover:shadow-md"
-                                    title="Guardar cambios"
-                                  >
-                                    <span className="material-symbols-outlined text-xl">save</span>
-                                  </button>
                                   <button
                                     onClick={() => handleAprobar(dia.reporte!.id)}
                                     disabled={!puedeAprobarDia(dia.dia).puede}
@@ -1297,19 +1293,11 @@ export default function ReporteRevisionMensual() {
                                     <span className="material-symbols-outlined text-xl">cancel</span>
                                   </button>
                                 </div>
-                              ) : 
+                              ) :
                               // Gerente de Zona: corregir reportes aprobados
                               isGerenteZona && dia.reporte.estado === EstadoReporte.Aprobado ? (
                                 reporteEnCorreccion === dia.reporte.id ? (
-                                  // Botones de guardar/cancelar cuando está en modo corrección
                                   <div className="flex items-center justify-center gap-2">
-                                    <button
-                                      onClick={() => handleGuardarCambios(dia.reporte!.id)}
-                                      className="flex items-center justify-center w-9 h-9 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm hover:shadow-md"
-                                      title="Guardar corrección"
-                                    >
-                                      <span className="material-symbols-outlined text-xl">save</span>
-                                    </button>
                                     <button
                                       onClick={handleCancelarCorreccion}
                                       className="flex items-center justify-center w-9 h-9 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-all shadow-sm hover:shadow-md"
@@ -1319,7 +1307,6 @@ export default function ReporteRevisionMensual() {
                                     </button>
                                   </div>
                                 ) : (
-                                  // Botón de corregir
                                   <button
                                     onClick={() => handleIniciarCorreccion(dia.reporte!.id)}
                                     className="flex items-center justify-center w-9 h-9 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all shadow-sm hover:shadow-md"
@@ -1329,24 +1316,12 @@ export default function ReporteRevisionMensual() {
                                   </button>
                                 )
                               ) : (
-                                // Mostrar el estado del reporte
                                 <span className={`text-sm font-medium ${getEstadoColor(dia.reporte.estado)}`}>
                                   {dia.reporte.estado}
                                 </span>
                               )
                             ) : (
-                              // Botón para crear reporte manual (solo Gerente de Estación)
-                              isGerenteEstacion ? (
-                                <button
-                                  onClick={() => handleCrearReporte(dia.fecha)}
-                                  className="flex items-center justify-center w-9 h-9 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all shadow-sm hover:shadow-md"
-                                  title="Crear reporte manual"
-                                >
-                                  <span className="material-symbols-outlined text-xl">add_circle</span>
-                                </button>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )
+                              <span className="text-gray-400">-</span>
                             )}
                           </td>
                         </tr>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
+import { sileo } from 'sileo'
 import importExcelService, { ResultadoImportacion } from '../services/importExcelService'
 
 export default function ImportarReportes() {
@@ -13,13 +13,13 @@ export default function ImportarReportes() {
     onSuccess: (data) => {
       setResultado(data)
       if (data.exitosos > 0) {
-        toast.success(data.message)
+        sileo.success({ title: data.message })
       } else {
-        toast.error('No se pudo importar ningún registro')
+        sileo.error({ title: 'No se pudo importar ningún registro' })
       }
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Error al importar archivo')
+      sileo.error({ title: error.response?.data?.message || 'Error al importar archivo' })
       console.error('Error:', error)
     }
   })
@@ -32,7 +32,7 @@ export default function ImportarReportes() {
         setArchivo(file)
         setResultado(null)
       } else {
-        toast.error('Solo se permiten archivos Excel (.xlsx, .xls)')
+        sileo.error({ title: 'Solo se permiten archivos Excel (.xlsx, .xls)' })
       }
     }
   }
@@ -57,14 +57,14 @@ export default function ImportarReportes() {
         setArchivo(file)
         setResultado(null)
       } else {
-        toast.error('Solo se permiten archivos Excel (.xlsx, .xls)')
+        sileo.error({ title: 'Solo se permiten archivos Excel (.xlsx, .xls)' })
       }
     }
   }
 
   const handleImportar = () => {
     if (!archivo) {
-      toast.error('Selecciona un archivo primero')
+      sileo.error({ title: 'Selecciona un archivo primero' })
       return
     }
     importMutation.mutate(archivo)

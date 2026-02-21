@@ -13,6 +13,7 @@ import VistaHistorial from '../components/views/VistaHistorial'
 import VistaReportes from '../components/views/VistaReportes'
 import VistaDashboardGerenteEstacion from '../components/views/VistaDashboardGerenteEstacion'
 import { exportarReporteExcel } from '../utils/exportarExcel'
+import { sileo } from 'sileo'
 
 export default function DashboardGerenteEstacion() {
   const { user } = useAuth()
@@ -89,7 +90,7 @@ export default function DashboardGerenteEstacion() {
     },
     onError: (error: any) => {
       const errorMessage = error?.response?.data?.message || 'Error al actualizar el estado del reporte'
-      alert(errorMessage)
+      sileo.error({ title: errorMessage })
     },
   })
 

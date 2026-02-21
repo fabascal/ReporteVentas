@@ -19,11 +19,25 @@ interface ScrapDataItem {
   Producto: string
   Volumen: string
   Importe: string
+  Precio?: string
   'Volumen Admin': string
   'Importe Admin': string
   'Volumen Merma': string
   'Importe Merma': string
   Merma: string
+  'I.I.B.'?: string
+  IIB?: string
+  'Inventario Inicial'?: string
+  Compras?: string
+  CompraDocumento?: string
+  CompraRecepcion?: string
+  'I.F.F.B.'?: string
+  IFFB?: string
+  'Inventario Final'?: string
+  Aceites?: string
+  'Aceites y Lubricantes'?: string
+  'Importe Aceites'?: string
+  ImporteAceites?: string
 }
 
 interface ScrapResponse {
@@ -33,6 +47,71 @@ interface ScrapResponse {
 }
 
 export class ApiExternaService {
+  private readonly CLAVES_ACEITES = [
+    'Importe Aceites',
+    'ImporteAceites',
+    'Importe de Aceites',
+    'Aceites',
+    'Aceites y Lubricantes',
+    'Lubricantes',
+  ]
+
+  private normalizarClaveApi(valor: string): string {
+    return valor
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+  }
+
+  private parseApiNumber(value: unknown): number {
+    if (value === null || value === undefined) return 0
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+
+    const raw = String(value)
+      .replace(/[$%\s]/g, '')
+      .trim()
+
+    // Soporta:
+    // - 12,345.67 (separador de miles)
+    // - 12345,67 (decimal con coma)
+    const cleaned = raw.includes('.') && raw.includes(',')
+      ? raw.replace(/,/g, '')
+      : raw.replace(/,/g, '.')
+
+    if (!cleaned) return 0
+    const parsed = parseFloat(cleaned)
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+
+  private obtenerValorNumericoPorClaves(item: Record<string, unknown>, claves: string[]): number {
+    const mapaNormalizado = new Map<string, unknown>()
+    Object.entries(item).forEach(([key, value]) => {
+      mapaNormalizado.set(this.normalizarClaveApi(key), value)
+    })
+
+    for (const clave of claves) {
+      const valor = mapaNormalizado.get(this.normalizarClaveApi(clave))
+      if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
+        return this.parseApiNumber(valor)
+      }
+    }
+
+    return 0
+  }
+
+  private existeClaveConValor(item: Record<string, unknown>, claves: string[]): boolean {
+    const mapaNormalizado = new Map<string, unknown>()
+    Object.entries(item).forEach(([key, value]) => {
+      mapaNormalizado.set(this.normalizarClaveApi(key), value)
+    })
+
+    return claves.some((clave) => {
+      const valor = mapaNormalizado.get(this.normalizarClaveApi(clave))
+      return valor !== undefined && valor !== null && String(valor).trim() !== ''
+    })
+  }
+
   /**
    * Obtiene el token de la API externa
    */
@@ -142,9 +221,50 @@ export class ApiExternaService {
    * Obtiene datos de ventas y mermas de la API externa para una estación y fecha específica
    */
   async obtenerDatosEstacionFecha(identificadorExterno: string, fecha: string): Promise<{
-    premium?: { precio: number; litros: number; importe: number; mermaVolumen: number; mermaImporte: number; mermaPorcentaje: number }
-    magna?: { precio: number; litros: number; importe: number; mermaVolumen: number; mermaImporte: number; mermaPorcentaje: number }
-    diesel?: { precio: number; litros: number; importe: number; mermaVolumen: number; mermaImporte: number; mermaPorcentaje: number }
+    aceites?: number
+    aceitesDetectado?: boolean
+    premium?: {
+      precio: number
+      litros: number
+      importe: number
+      adminVolumen: number
+      adminImporte: number
+      mermaVolumen: number
+      mermaImporte: number
+      mermaPorcentaje: number
+      iib: number
+      compras: number
+      cct: number
+      iffb: number
+    }
+    magna?: {
+      precio: number
+      litros: number
+      importe: number
+      adminVolumen: number
+      adminImporte: number
+      mermaVolumen: number
+      mermaImporte: number
+      mermaPorcentaje: number
+      iib: number
+      compras: number
+      cct: number
+      iffb: number
+    }
+    diesel?: {
+      precio: number
+      litros: number
+      importe: number
+      adminVolumen: number
+      adminImporte: number
+      mermaVolumen: number
+      mermaImporte: number
+      mermaPorcentaje: number
+      iib: number
+      compras: number
+      cct: number
+      iffb: number
+    }
   }> {
     try {
       // Obtener configuración de API (usando la misma lógica que sincronizarDatos)
@@ -214,7 +334,9 @@ export class ApiExternaService {
       })
 
       return {
-        premium: reporte.premium.litros > 0 ? {
+        aceites: reporte.aceites || 0,
+        aceitesDetectado: Boolean(reporte.aceitesDetectado),
+        premium: {
           precio: reporte.premium.precio,
           litros: reporte.premium.litros,
           importe: reporte.premium.importe,
@@ -223,8 +345,12 @@ export class ApiExternaService {
           mermaVolumen: reporte.premium.mermaVolumen,
           mermaImporte: reporte.premium.mermaImporte,
           mermaPorcentaje: reporte.premium.mermaPorcentaje,
-        } : undefined,
-        magna: reporte.magna.litros > 0 ? {
+          iib: reporte.premium.iib || 0,
+          compras: reporte.premium.compras || 0,
+          cct: reporte.premium.cct || 0,
+          iffb: reporte.premium.iffb || 0,
+        },
+        magna: {
           precio: reporte.magna.precio,
           litros: reporte.magna.litros,
           importe: reporte.magna.importe,
@@ -233,8 +359,12 @@ export class ApiExternaService {
           mermaVolumen: reporte.magna.mermaVolumen,
           mermaImporte: reporte.magna.mermaImporte,
           mermaPorcentaje: reporte.magna.mermaPorcentaje,
-        } : undefined,
-        diesel: reporte.diesel.litros > 0 ? {
+          iib: reporte.magna.iib || 0,
+          compras: reporte.magna.compras || 0,
+          cct: reporte.magna.cct || 0,
+          iffb: reporte.magna.iffb || 0,
+        },
+        diesel: {
           precio: reporte.diesel.precio,
           litros: reporte.diesel.litros,
           importe: reporte.diesel.importe,
@@ -243,7 +373,11 @@ export class ApiExternaService {
           mermaVolumen: reporte.diesel.mermaVolumen,
           mermaImporte: reporte.diesel.mermaImporte,
           mermaPorcentaje: reporte.diesel.mermaPorcentaje,
-        } : undefined,
+          iib: reporte.diesel.iib || 0,
+          compras: reporte.diesel.compras || 0,
+          cct: reporte.diesel.cct || 0,
+          iffb: reporte.diesel.iffb || 0,
+        },
       }
     } catch (error) {
       console.error('Error al obtener datos de estación y fecha:', error)
@@ -438,9 +572,12 @@ export class ApiExternaService {
           identificadorExterno: identificador,
           nombreEstacion: this.extraerNombreEstacion(item.Estación),
           fecha: null, // Se debe proporcionar desde fuera
-          premium: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
-          magna: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
-          diesel: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0 },
+          aceites: 0,
+          aceitesAsignado: false,
+          aceitesDetectado: false,
+          premium: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0, iib: 0, compras: 0, cct: 0, iffb: 0 },
+          magna: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0, iib: 0, compras: 0, cct: 0, iffb: 0 },
+          diesel: { precio: 0, litros: 0, importe: 0, adminVolumen: 0, adminImporte: 0, mermaVolumen: 0, mermaImporte: 0, mermaPorcentaje: 0, mermaPorcentajePonderado: 0, volumenTotalParaMerma: 0, iib: 0, compras: 0, cct: 0, iffb: 0 },
         })
       }
 
@@ -457,15 +594,46 @@ export class ApiExternaService {
       }
 
       // Mapear productos y sumar si hay múltiples registros del mismo producto
-      const volumen = parseFloat(item.Volumen) || 0
-      const importe = parseFloat(item.Importe) || 0
-      const volumenAdmin = parseFloat(item['Volumen Admin'] || '0') || 0
-      const importeAdmin = parseFloat(item['Importe Admin'] || '0') || 0
-      const volumenMerma = parseFloat(item['Volumen Merma'] || '0') || 0
-      const importeMerma = parseFloat(item['Importe Merma'] || '0') || 0
+      const volumen = this.parseApiNumber(item.Volumen)
+      const importe = this.parseApiNumber(item.Importe)
+      const volumenAdmin = this.parseApiNumber(item['Volumen Admin'] || '0')
+      const importeAdmin = this.parseApiNumber(item['Importe Admin'] || '0')
+      const volumenMerma = this.parseApiNumber(item['Volumen Merma'] || '0')
+      const importeMerma = this.parseApiNumber(item['Importe Merma'] || '0')
       // El porcentaje viene como decimal (ej: 0.025478 = 2.5478%), lo convertimos a porcentaje
-      const mermaPorcentaje = parseFloat(item.Merma || '0') * 100 || 0
-      const precioUnitario = volumen > 0 ? importe / volumen : 0
+      const mermaPorcentaje = this.parseApiNumber(item.Merma || '0') * 100 || 0
+      const itemRecord = item as unknown as Record<string, unknown>
+      const precioDirecto = this.obtenerValorNumericoPorClaves(itemRecord, [
+        'Precio',
+        'Precio Unitario',
+        'P.U.',
+      ])
+      const precioUnitario = precioDirecto > 0 ? precioDirecto : (volumen > 0 ? importe / volumen : 0)
+      const iibDirecto = this.obtenerValorNumericoPorClaves(itemRecord, ['I.I.B.', 'IIB', 'Inventario Inicial'])
+      // API nueva:
+      // - CompraDocumento -> C (compras)
+      // - CompraRecepcion -> CCT
+      const comprasDirecto = this.obtenerValorNumericoPorClaves(itemRecord, ['CompraDocumento', 'Compras', 'Compra', 'C'])
+      const cctDirecto = this.obtenerValorNumericoPorClaves(itemRecord, [
+        'CompraRecepcion',
+        'Compra Recepcion',
+        'Compra Recepción',
+        'CCT',
+      ])
+      const iffbDirecto = this.obtenerValorNumericoPorClaves(itemRecord, ['I.F.F.B.', 'IFFB', 'Inventario Final'])
+      const aceitesDirecto = this.obtenerValorNumericoPorClaves(itemRecord, this.CLAVES_ACEITES)
+      const aceitesDisponible = this.existeClaveConValor(itemRecord, this.CLAVES_ACEITES)
+
+      // Regla de negocio: aceites viene repetido por producto, se toma solo un valor por día/estación.
+      if (aceitesDisponible) {
+        reporte.aceitesDetectado = true
+        if (!reporte.aceitesAsignado && aceitesDirecto !== 0) {
+          reporte.aceites = aceitesDirecto
+          reporte.aceitesAsignado = true
+        } else if (!reporte.aceitesAsignado) {
+          reporte.aceites = aceitesDirecto
+        }
+      }
 
       // Determinar el tipo de producto según el catálogo
       const tipoProducto = productoCatalogo.tipo
@@ -474,7 +642,9 @@ export class ApiExternaService {
         if (reporte.premium.litros > 0) {
           const totalLitros = reporte.premium.litros + volumen
           const totalImporte = reporte.premium.importe + importe
-          reporte.premium.precio = totalLitros > 0 ? totalImporte / totalLitros : 0
+          reporte.premium.precio = totalLitros > 0
+            ? ((reporte.premium.precio * (reporte.premium.litros)) + (precioUnitario * volumen)) / totalLitros
+            : precioUnitario
           reporte.premium.litros = totalLitros
           reporte.premium.importe = totalImporte
           reporte.premium.adminVolumen = reporte.premium.adminVolumen + volumenAdmin
@@ -489,6 +659,10 @@ export class ApiExternaService {
           reporte.premium.mermaPorcentaje = volumenTotal > 0
             ? ((porcentajeAnterior * volumenAnterior) + (mermaPorcentaje * volumen)) / volumenTotal
             : mermaPorcentaje
+          reporte.premium.iib = iibDirecto
+          reporte.premium.compras = comprasDirecto
+          reporte.premium.cct = cctDirecto
+          reporte.premium.iffb = iffbDirecto
         } else {
           reporte.premium.precio = precioUnitario
           reporte.premium.litros = volumen
@@ -499,12 +673,18 @@ export class ApiExternaService {
           reporte.premium.mermaImporte = importeMerma
           // Usar el porcentaje que viene de la API directamente
           reporte.premium.mermaPorcentaje = mermaPorcentaje
+          reporte.premium.iib = iibDirecto
+          reporte.premium.compras = comprasDirecto
+          reporte.premium.cct = cctDirecto
+          reporte.premium.iffb = iffbDirecto
         }
       } else if (tipoProducto === 'magna') {
         if (reporte.magna.litros > 0) {
           const totalLitros = reporte.magna.litros + volumen
           const totalImporte = reporte.magna.importe + importe
-          reporte.magna.precio = totalLitros > 0 ? totalImporte / totalLitros : 0
+          reporte.magna.precio = totalLitros > 0
+            ? ((reporte.magna.precio * (reporte.magna.litros)) + (precioUnitario * volumen)) / totalLitros
+            : precioUnitario
           reporte.magna.litros = totalLitros
           reporte.magna.importe = totalImporte
           reporte.magna.adminVolumen = reporte.magna.adminVolumen + volumenAdmin
@@ -519,6 +699,10 @@ export class ApiExternaService {
           reporte.magna.mermaPorcentaje = volumenTotal > 0
             ? ((porcentajeAnterior * volumenAnterior) + (mermaPorcentaje * volumen)) / volumenTotal
             : mermaPorcentaje
+          reporte.magna.iib = iibDirecto
+          reporte.magna.compras = comprasDirecto
+          reporte.magna.cct = cctDirecto
+          reporte.magna.iffb = iffbDirecto
         } else {
           reporte.magna.precio = precioUnitario
           reporte.magna.litros = volumen
@@ -529,12 +713,18 @@ export class ApiExternaService {
           reporte.magna.mermaImporte = importeMerma
           // Usar el porcentaje que viene de la API directamente
           reporte.magna.mermaPorcentaje = mermaPorcentaje
+          reporte.magna.iib = iibDirecto
+          reporte.magna.compras = comprasDirecto
+          reporte.magna.cct = cctDirecto
+          reporte.magna.iffb = iffbDirecto
         }
       } else if (tipoProducto === 'diesel') {
         if (reporte.diesel.litros > 0) {
           const totalLitros = reporte.diesel.litros + volumen
           const totalImporte = reporte.diesel.importe + importe
-          reporte.diesel.precio = totalLitros > 0 ? totalImporte / totalLitros : 0
+          reporte.diesel.precio = totalLitros > 0
+            ? ((reporte.diesel.precio * (reporte.diesel.litros)) + (precioUnitario * volumen)) / totalLitros
+            : precioUnitario
           reporte.diesel.litros = totalLitros
           reporte.diesel.importe = totalImporte
           reporte.diesel.adminVolumen = reporte.diesel.adminVolumen + volumenAdmin
@@ -549,6 +739,10 @@ export class ApiExternaService {
           reporte.diesel.mermaPorcentaje = volumenTotal > 0
             ? ((porcentajeAnterior * volumenAnterior) + (mermaPorcentaje * volumen)) / volumenTotal
             : mermaPorcentaje
+          reporte.diesel.iib = iibDirecto
+          reporte.diesel.compras = comprasDirecto
+          reporte.diesel.cct = cctDirecto
+          reporte.diesel.iffb = iffbDirecto
         } else {
           reporte.diesel.precio = precioUnitario
           reporte.diesel.litros = volumen
@@ -559,6 +753,10 @@ export class ApiExternaService {
           reporte.diesel.mermaImporte = importeMerma
           // Usar el porcentaje que viene de la API directamente
           reporte.diesel.mermaPorcentaje = mermaPorcentaje
+          reporte.diesel.iib = iibDirecto
+          reporte.diesel.compras = comprasDirecto
+          reporte.diesel.cct = cctDirecto
+          reporte.diesel.iffb = iffbDirecto
         }
       }
     })
@@ -638,7 +836,7 @@ export class ApiExternaService {
 
           // Verificar si ya existe un reporte para esta estación y fecha
           const reporteExistente = await pool.query(
-            'SELECT id FROM reportes WHERE estacion_id = $1 AND fecha::date = $2::date',
+            'SELECT id, aceites FROM reportes WHERE estacion_id = $1 AND fecha::date = $2::date',
             [estacionId, fechaInicio]
           )
 
@@ -651,14 +849,14 @@ export class ApiExternaService {
               mermaVolumen: datosReporte.premium.mermaVolumen || 0,
               mermaImporte: datosReporte.premium.mermaImporte || 0,
               mermaPorcentaje: datosReporte.premium.mermaPorcentaje || 0,
-              iib: 0,
-              compras: 0,
-              cct: 0,
+              iib: datosReporte.premium.iib || 0,
+              compras: datosReporte.premium.compras || 0,
+              cct: datosReporte.premium.cct || 0,
               vDsc: 0,
               dc: 0,
               difVDsc: 0,
               if: 0,
-              iffb: 0,
+              iffb: datosReporte.premium.iffb || 0,
             },
             magna: {
               precio: datosReporte.magna.precio,
@@ -667,14 +865,14 @@ export class ApiExternaService {
               mermaVolumen: datosReporte.magna.mermaVolumen || 0,
               mermaImporte: datosReporte.magna.mermaImporte || 0,
               mermaPorcentaje: datosReporte.magna.mermaPorcentaje || 0,
-              iib: 0,
-              compras: 0,
-              cct: 0,
+              iib: datosReporte.magna.iib || 0,
+              compras: datosReporte.magna.compras || 0,
+              cct: datosReporte.magna.cct || 0,
               vDsc: 0,
               dc: 0,
               difVDsc: 0,
               if: 0,
-              iffb: 0,
+              iffb: datosReporte.magna.iffb || 0,
             },
             diesel: {
               precio: datosReporte.diesel.precio,
@@ -683,14 +881,14 @@ export class ApiExternaService {
               mermaVolumen: datosReporte.diesel.mermaVolumen || 0,
               mermaImporte: datosReporte.diesel.mermaImporte || 0,
               mermaPorcentaje: datosReporte.diesel.mermaPorcentaje || 0,
-              iib: 0,
-              compras: 0,
-              cct: 0,
+              iib: datosReporte.diesel.iib || 0,
+              compras: datosReporte.diesel.compras || 0,
+              cct: datosReporte.diesel.cct || 0,
               vDsc: 0,
               dc: 0,
               difVDsc: 0,
               if: 0,
-              iffb: 0,
+              iffb: datosReporte.diesel.iffb || 0,
             },
           }
 
@@ -781,9 +979,12 @@ export class ApiExternaService {
 
           if (reporteExistente.rows.length > 0) {
             // Actualizar reporte existente (solo campos generales)
+            const aceitesParaGuardar = datosReporte.aceitesDetectado
+              ? (datosReporte.aceites || 0)
+              : (reporteExistente.rows[0].aceites || 0)
             await pool.query(
-              `UPDATE reportes SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-              [reporteExistente.rows[0].id]
+              `UPDATE reportes SET aceites = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+              [reporteExistente.rows[0].id, aceitesParaGuardar]
             )
             // Actualizar productos
             await guardarProductosReporte(reporteExistente.rows[0].id, productosParaGuardar, true)
@@ -795,11 +996,11 @@ export class ApiExternaService {
             // Crear nuevo reporte (solo campos generales)
             const result = await pool.query(
               `
-              INSERT INTO reportes (estacion_id, fecha, estado, creado_por)
-              VALUES ($1, $2::date, $3, $4)
+              INSERT INTO reportes (estacion_id, fecha, aceites, estado, creado_por)
+              VALUES ($1, $2::date, $3, $4, $5)
               RETURNING id
               `,
-              [estacionId, fechaInicio, 'Pendiente', usuarioId]
+              [estacionId, fechaInicio, datosReporte.aceites || 0, 'Pendiente', usuarioId]
             )
             // Guardar productos
             await guardarProductosReporte(result.rows[0].id, productosParaGuardar, false)

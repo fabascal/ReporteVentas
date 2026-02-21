@@ -48,6 +48,13 @@ interface Entrega {
   zona_origen_id?: string;
   monto: number;
   concepto: string;
+  estado_entrega?: 'pendiente_firma' | 'confirmada' | string;
+  archivo_nombre?: string;
+  archivo_ruta?: string;
+  fecha_firma?: string;
+  observaciones_firma?: string;
+  destinatario_id?: string;
+  destinatario_nombre?: string;
   registrado_por: string;
   estacion_nombre?: string;
   zona_nombre?: string;
@@ -63,17 +70,28 @@ interface EntregasResponse {
 interface RegistrarEntregaData {
   tipo_entrega: 'estacion_zona' | 'zona_direccion';
   estacion_id?: string;
-  zona_id: string;
+  zona_id?: string;
+  destinatario_id?: string;
   fecha: string;
   monto: number;
   concepto?: string;
+  archivo?: File;
 }
 
 interface LimiteDisponibleResponse {
   limite_gastos: number;
   gastos_acumulados: number;
+  disponible_por_limite: number;
+  disponible_por_resguardo: number;
   disponible: number;
   periodo: { mes: number; anio: number };
+}
+
+interface FirmanteDireccion {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Direccion' | 'DirectorOperaciones' | string;
 }
 
 export const financieroService = {
@@ -136,9 +154,20 @@ export const financieroService = {
    * Registrar una entrega
    */
   registrarEntrega: async (data: RegistrarEntregaData): Promise<{ message: string; entrega: Entrega }> => {
+    const formData = new FormData();
+    formData.append('tipo_entrega', data.tipo_entrega);
+    if (data.estacion_id) formData.append('estacion_id', data.estacion_id);
+    if (data.zona_id) formData.append('zona_id', data.zona_id);
+    if (data.destinatario_id) formData.append('destinatario_id', data.destinatario_id);
+    formData.append('fecha', data.fecha);
+    formData.append('monto', String(data.monto));
+    formData.append('concepto', data.concepto || '');
+    if (data.archivo) formData.append('archivo', data.archivo);
+
     const response = await api.post<{ message: string; entrega: Entrega }>(
-      '/financiero/entregas',
-      data
+      '/financiero/entregas-con-archivo',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
     );
     return response.data;
   },
@@ -155,6 +184,33 @@ export const financieroService = {
     
     const response = await api.get<EntregasResponse>(
       `/financiero/entregas?${params.toString()}`
+    );
+    return response.data;
+  },
+
+  obtenerEntregasPendientesFirma: async (mes: number, anio: number, zona_id?: string) => {
+    const params = new URLSearchParams();
+    params.append('mes', mes.toString());
+    params.append('anio', anio.toString());
+    if (zona_id) params.append('zona_id', zona_id);
+
+    const response = await api.get<EntregasResponse & { zona_id?: string }>(
+      `/financiero/entregas/pendientes-firma?${params.toString()}`
+    );
+    return response.data;
+  },
+
+  obtenerFirmantesDireccion: async () => {
+    const response = await api.get<{ usuarios: FirmanteDireccion[] }>(
+      '/financiero/entregas/firmantes-direccion'
+    );
+    return response.data;
+  },
+
+  firmarEntrega: async (entregaId: string, observaciones?: string) => {
+    const response = await api.post<{ message: string; entrega: Entrega }>(
+      `/financiero/entregas/${entregaId}/firmar`,
+      { observaciones: observaciones || '' }
     );
     return response.data;
   },

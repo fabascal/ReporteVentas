@@ -179,6 +179,22 @@ const menuConfig: MenuItem[] = [
     icon: 'dashboard',
     roles: [Role.Direccion],
   },
+  {
+    id: 'director-reportes',
+    type: 'route',
+    path: '/director/reportes',
+    label: 'Reportes',
+    icon: 'description',
+    roles: [Role.Direccion],
+  },
+  {
+    id: 'director-liquidaciones',
+    type: 'route',
+    path: '/director/liquidaciones',
+    label: 'Liquidaciones',
+    icon: 'request_quote',
+    roles: [Role.Direccion],
+  },
 ];
 
 async function syncMenus() {

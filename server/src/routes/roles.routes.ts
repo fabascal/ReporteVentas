@@ -11,11 +11,11 @@ router.use(authenticateToken)
 // Obtener todos los roles (solo Admin)
 router.get('/', requireRole(Role.Administrador), rolesController.getRoles)
 
-// Obtener rol por ID (solo Admin)
-router.get('/:id', requireRole(Role.Administrador), rolesController.getRoleById)
-
 // Obtener rol por código (cualquier usuario autenticado)
 router.get('/codigo/:codigo', rolesController.getRoleByCodigo)
+
+// Obtener rol por ID (solo Admin)
+router.get('/:id', requireRole(Role.Administrador), rolesController.getRoleById)
 
 // Crear rol (solo Admin)
 router.post('/', requireRole(Role.Administrador), rolesController.createRole)

@@ -354,13 +354,24 @@ export const ejerciciosController = {
         return res.status(400).json({ error: 'Datos incompletos' });
       }
 
-      // Reabrir la liquidación
-      await pool.query(
-        `UPDATE liquidaciones_mensuales 
-         SET estado = 'abierto', reabierto_en = CURRENT_TIMESTAMP, reabierto_por = $1
-         WHERE zona_id = $2 AND anio = $3 AND mes = $4`,
-        [user_id, zona_id, anio, mes]
+      // Reabrir la liquidación usando columnas existentes en el esquema actual.
+      const reopenResult = await pool.query(
+        `UPDATE liquidaciones_mensuales
+         SET estado = 'abierto',
+             fecha_cierre = NULL,
+             cerrado_por = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE zona_id = $1
+           AND anio = $2
+           AND mes = $3
+           AND estado = 'cerrado'
+         RETURNING id`,
+        [zona_id, anio, mes]
       );
+
+      if (reopenResult.rows.length === 0) {
+        return res.status(400).json({ error: 'No hay liquidación cerrada para reabrir' });
+      }
 
       // Registrar en auditoría
       await registrarAuditoriaGeneral({

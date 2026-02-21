@@ -140,6 +140,25 @@ async function obtenerProductosReporte(reporteId: string) {
   return productos
 }
 
+async function estaPeriodoOperativoCerrado(zonaId: string, fecha: string | Date): Promise<boolean> {
+  const fechaRef = typeof fecha === 'string' ? fecha.split('T')[0] : fecha.toISOString().split('T')[0]
+
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM zonas_periodos_cierre
+    WHERE zona_id = $1
+      AND anio = EXTRACT(YEAR FROM $2::date)::int
+      AND mes = EXTRACT(MONTH FROM $2::date)::int
+      AND esta_cerrado = true
+    LIMIT 1
+    `,
+    [zonaId, fechaRef]
+  )
+
+  return result.rows.length > 0
+}
+
 // Función helper para guardar/actualizar productos de un reporte
 async function guardarProductosReporte(
   reporteId: string,
@@ -650,6 +669,22 @@ export const reportesController = {
         return res.status(403).json({ message: 'No tienes acceso a esta estación' })
       }
 
+      // Candado de cierre operativo por zona/período
+      const estacionMeta = await pool.query(
+        'SELECT id, zona_id FROM estaciones WHERE id = $1',
+        [estacionId]
+      )
+      if (estacionMeta.rows.length === 0) {
+        return res.status(404).json({ message: 'Estación no encontrada' })
+      }
+      const zonaId = estacionMeta.rows[0].zona_id
+      const periodoOperativoCerrado = await estaPeriodoOperativoCerrado(zonaId, fecha)
+      if (periodoOperativoCerrado) {
+        return res.status(409).json({
+          message: 'El período operativo de la zona está cerrado. No se pueden crear reportes.',
+        })
+      }
+
       // Calcular importe si no viene (precio * litros)
       const premiumImporte = premium.importe || premium.precio * premium.litros
       const magnaImporte = magna.importe || magna.precio * magna.litros
@@ -856,7 +891,7 @@ export const reportesController = {
       // Obtener información del reporte
       const reporteCheck = await pool.query(
         `
-        SELECT r.estado, r.estacion_id, r.creado_por, e.zona_id, e.nombre as estacion_nombre
+        SELECT r.estado, r.estacion_id, r.creado_por, r.fecha, e.zona_id, e.nombre as estacion_nombre
         FROM reportes r
         JOIN estaciones e ON r.estacion_id = e.id
         WHERE r.id = $1
@@ -873,6 +908,15 @@ export const reportesController = {
       const zonaId = reporteActual.zona_id
       const estacionId = reporteActual.estacion_id
       const creadoPor = reporteActual.creado_por
+      const fechaReporte = reporteActual.fecha
+
+      // Candado de cierre operativo por zona/período
+      const periodoOperativoCerrado = await estaPeriodoOperativoCerrado(zonaId, fechaReporte)
+      if (periodoOperativoCerrado) {
+        return res.status(409).json({
+          message: 'El período operativo de la zona está cerrado. No se puede aprobar/rechazar el reporte.',
+        })
+      }
 
       console.log(`[updateEstado] Usuario: ${req.user.id}, Rol: ${req.user.role}, Reporte: ${id}, Estación: ${estacionId}, Estado actual: ${estadoActual}`)
 
@@ -1059,6 +1103,14 @@ export const reportesController = {
 
       const reporte = reporteCheck.rows[0]
 
+      // Candado de cierre operativo sobre el reporte actual
+      const periodoActualCerrado = await estaPeriodoOperativoCerrado(reporte.zona_id, reporte.fecha)
+      if (periodoActualCerrado) {
+        return res.status(409).json({
+          message: 'El período operativo de la zona está cerrado. No se puede editar el reporte.',
+        })
+      }
+
       console.log('=== DEBUG updateReporte ===')
       console.log('Usuario ID:', req.user.id)
       console.log('Usuario Role:', req.user.role)
@@ -1159,6 +1211,22 @@ export const reportesController = {
       })
 
       console.log('Validaciones pasadas, procediendo a actualizar...')
+
+      // Candado de cierre operativo sobre el destino (zona/fecha nuevas)
+      const zonaDestinoResult = await pool.query(
+        'SELECT zona_id FROM estaciones WHERE id = $1',
+        [estacionIdParaVerificar]
+      )
+      if (zonaDestinoResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Estación destino no encontrada' })
+      }
+      const zonaDestinoId = zonaDestinoResult.rows[0].zona_id
+      const periodoDestinoCerrado = await estaPeriodoOperativoCerrado(zonaDestinoId, fecha)
+      if (periodoDestinoCerrado) {
+        return res.status(409).json({
+          message: 'El período operativo de la zona está cerrado. No se puede editar el reporte.',
+        })
+      }
 
       // Siempre recalcular importe basado en precio * litros (no usar el importe del body)
       const premiumImporte = premium.precio * premium.litros
@@ -1811,11 +1879,6 @@ export const reportesController = {
         return res.status(401).json({ message: 'No autenticado' })
       }
 
-      // Solo Administrador puede ver todos los logs
-      if (req.user.role !== 'Administrador') {
-        return res.status(403).json({ message: 'No autorizado' })
-      }
-
       // Parámetros de paginación
       const page = parseInt(req.query.page as string) || 1
       const limit = parseInt(req.query.limit as string) || 20
@@ -1949,11 +2012,6 @@ export const reportesController = {
         return res.status(401).json({ message: 'No autenticado' })
       }
 
-      // Solo Administrador puede ver todos los logs
-      if (req.user.role !== 'Administrador') {
-        return res.status(403).json({ message: 'No autorizado' })
-      }
-
       // Parámetros de paginación
       const page = parseInt(req.query.page as string) || 1
       const limit = parseInt(req.query.limit as string) || 20
@@ -1973,6 +2031,619 @@ export const reportesController = {
       res.json(result)
     } catch (error) {
       console.error('Error al obtener logs del sistema:', error)
+      res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async getReporteERPorZona(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'No autenticado' })
+      }
+
+      const mes = parseInt(req.query.mes as string, 10)
+      const anio = parseInt(req.query.anio as string, 10)
+      const zonaId = (req.query.zonaId as string) || ''
+
+      if (!mes || mes < 1 || mes > 12) {
+        return res.status(400).json({ message: 'El mes es requerido y debe estar entre 1 y 12' })
+      }
+
+      if (!anio || anio < 2000 || anio > 2100) {
+        return res.status(400).json({ message: 'El año es requerido y debe ser válido' })
+      }
+
+      if (!zonaId) {
+        return res.status(400).json({ message: 'La zona es requerida' })
+      }
+
+      const zonaResult = await pool.query(
+        `SELECT id, nombre, activa
+         FROM zonas
+         WHERE id = $1`,
+        [zonaId]
+      )
+
+      if (zonaResult.rows.length === 0) {
+        return res.status(404).json({ message: 'Zona no encontrada' })
+      }
+
+      if (!zonaResult.rows[0].activa) {
+        return res.status(400).json({ message: 'La zona seleccionada está inactiva' })
+      }
+
+      const productosResult = await pool.query(
+        `SELECT id, tipo_producto, nombre_display, orden
+         FROM productos_catalogo
+         WHERE activo = true
+         ORDER BY orden ASC, nombre_display ASC`
+      )
+
+      const dataResult = await pool.query(
+        `SELECT
+           e.id AS estacion_id,
+           e.nombre AS estacion_nombre,
+           COALESCE(rm.premium_merma_porcentaje_promedio, 0) AS premium_e_porcentaje,
+           COALESCE(rm.magna_merma_porcentaje_promedio, 0) AS magna_e_porcentaje,
+           COALESCE(rm.diesel_merma_porcentaje_promedio, 0) AS diesel_e_porcentaje
+         FROM estaciones e
+         INNER JOIN zonas z ON z.id = e.zona_id
+         LEFT JOIN reportes_mensuales rm
+           ON rm.estacion_id = e.id
+           AND rm.mes = $1
+           AND rm.anio = $2
+         WHERE e.activa = true
+           AND z.id = $3
+         ORDER BY e.nombre ASC`,
+        [mes, anio, zonaId]
+      )
+
+      const productos = productosResult.rows.map((p) => ({
+        id: p.id,
+        tipo_producto: p.tipo_producto,
+        nombre_display: p.nombre_display,
+      }))
+
+      const filas = dataResult.rows.map((row) => {
+        const valores: Record<string, number> = {}
+
+        productos.forEach((producto) => {
+          let value = 0
+
+          switch ((producto.tipo_producto || '').toLowerCase()) {
+            case 'premium':
+              value = parseFloat(row.premium_e_porcentaje || '0')
+              break
+            case 'magna':
+              value = parseFloat(row.magna_e_porcentaje || '0')
+              break
+            case 'diesel':
+              value = parseFloat(row.diesel_e_porcentaje || '0')
+              break
+            default:
+              value = 0
+              break
+          }
+
+          valores[producto.id] = Math.round(value * 10000) / 10000
+        })
+
+        return {
+          estacion_id: row.estacion_id,
+          estacion_nombre: row.estacion_nombre,
+          valores,
+        }
+      })
+
+      res.json({
+        periodo: { mes, anio },
+        zona: {
+          id: zonaResult.rows[0].id,
+          nombre: zonaResult.rows[0].nombre,
+        },
+        productos,
+        filas,
+      })
+    } catch (error) {
+      console.error('Error al obtener reporte ER por zona:', error)
+      res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async getReporteRGeneral(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'No autenticado' })
+      }
+
+      const mes = parseInt(req.query.mes as string, 10)
+      const anio = parseInt(req.query.anio as string, 10)
+      const producto = String(req.query.producto || '').toLowerCase()
+
+      if (!mes || mes < 1 || mes > 12) {
+        return res.status(400).json({ message: 'El mes es requerido y debe estar entre 1 y 12' })
+      }
+
+      if (!anio || anio < 2000 || anio > 2100) {
+        return res.status(400).json({ message: 'El año es requerido y debe ser válido' })
+      }
+
+      if (!['premium', 'magna', 'diesel'].includes(producto)) {
+        return res.status(400).json({ message: 'El producto debe ser premium, magna o diesel' })
+      }
+
+      const zonasResult = await pool.query(
+        `SELECT id, nombre, orden_reporte
+         FROM zonas
+         WHERE activa = true
+         ORDER BY COALESCE(orden_reporte, 99) ASC, nombre ASC`
+      )
+
+      const dataResult = await pool.query(
+        `WITH estaciones_base AS (
+           SELECT
+             e.id AS estacion_id,
+             e.nombre AS estacion_nombre,
+             z.id AS zona_id,
+             z.nombre AS zona_nombre,
+             COALESCE(z.orden_reporte, 99) AS zona_orden
+           FROM estaciones e
+           INNER JOIN zonas z ON z.id = e.zona_id
+           WHERE e.activa = true
+             AND z.activa = true
+         ),
+         reportes_producto AS (
+           SELECT
+             r.id AS reporte_id,
+             r.estacion_id,
+             r.fecha,
+             rp.merma_volumen,
+             rp.compras,
+             rp.litros,
+             rp.iib,
+             rp.iffb
+           FROM reportes r
+           INNER JOIN reporte_productos rp ON rp.reporte_id = r.id
+           INNER JOIN productos_catalogo pc ON pc.id = rp.producto_id
+           WHERE r.estado = 'Aprobado'
+             AND EXTRACT(MONTH FROM r.fecha) = $1
+             AND EXTRACT(YEAR FROM r.fecha) = $2
+             AND LOWER(pc.tipo_producto) = $3
+         ),
+         agregados AS (
+           SELECT
+             rp.estacion_id,
+             COALESCE(SUM(rp.merma_volumen), 0) AS ee_total,
+             COALESCE(SUM(rp.compras), 0) AS compras_total,
+             COALESCE(SUM(rp.litros - rp.merma_volumen), 0) AS lts_total,
+             COALESCE(SUM(rp.litros - rp.merma_volumen), 0) AS vc_total
+           FROM reportes_producto rp
+           GROUP BY rp.estacion_id
+         ),
+         primer_dia AS (
+           SELECT DISTINCT ON (rp.estacion_id)
+             rp.estacion_id,
+             rp.iib AS iib_primer_dia
+           FROM reportes_producto rp
+           ORDER BY rp.estacion_id, rp.fecha ASC, rp.reporte_id ASC
+         ),
+         ultimo_dia AS (
+           SELECT DISTINCT ON (rp.estacion_id)
+             rp.estacion_id,
+             rp.iffb AS iffb_ultimo_dia
+           FROM reportes_producto rp
+           ORDER BY rp.estacion_id, rp.fecha DESC, rp.reporte_id DESC
+         )
+         SELECT
+           eb.zona_id,
+           eb.zona_nombre,
+          eb.zona_orden,
+           eb.estacion_id,
+           eb.estacion_nombre,
+           COALESCE(ag.ee_total, 0) AS ee_total,
+           COALESCE(ag.lts_total, 0) AS lts_total,
+           COALESCE(ag.vc_total, 0) AS vc_total,
+           COALESCE(ag.compras_total, 0) AS compras_total,
+           COALESCE(pd.iib_primer_dia, 0) AS iib_primer_dia,
+           COALESCE(ud.iffb_ultimo_dia, 0) AS iffb_ultimo_dia
+         FROM estaciones_base eb
+         LEFT JOIN agregados ag ON ag.estacion_id = eb.estacion_id
+         LEFT JOIN primer_dia pd ON pd.estacion_id = eb.estacion_id
+         LEFT JOIN ultimo_dia ud ON ud.estacion_id = eb.estacion_id
+        ORDER BY eb.zona_orden ASC, eb.zona_nombre ASC, eb.estacion_nombre ASC`,
+        [mes, anio, producto]
+      )
+
+      const zonasMap = new Map<
+        string,
+        {
+          zona_id: string
+          zona_nombre: string
+          zona_orden: number
+          estaciones: Array<{
+            estacion_id: string
+            estacion_nombre: string
+            iib: number
+            c: number
+            lts: number
+            it: number
+            iffb: number
+            ee: number
+            d: number
+            er: number
+            vc: number
+            er_porcentaje: number
+            ee_porcentaje: number
+          }>
+        }
+      >()
+
+      zonasResult.rows.forEach((zona) => {
+        zonasMap.set(zona.id, {
+          zona_id: zona.id,
+          zona_nombre: zona.nombre,
+          zona_orden: parseInt(zona.orden_reporte || '99', 10) || 99,
+          estaciones: [],
+        })
+      })
+
+      dataResult.rows.forEach((row) => {
+        const ee = parseFloat(row.ee_total || '0')
+        const ltsTotal = parseFloat(row.lts_total || '0')
+        const vc = parseFloat(row.vc_total || '0')
+        const comprasTotal = parseFloat(row.compras_total || '0')
+        const iibPrimerDia = parseFloat(row.iib_primer_dia || '0')
+        const iffbUltimoDia = parseFloat(row.iffb_ultimo_dia || '0')
+
+        // I.T. = I.I.B. (primer día) + Compras del mes - LTS del mes
+        const it = iibPrimerDia + comprasTotal - ltsTotal
+        // Se usa este signo para alinear con el ejemplo validado por negocio:
+        // Abasolo: I.T. 35399, I.F.F.B. 35173 => D = -226
+        const d = iffbUltimoDia - it
+        const er = ee + d
+        const erPorcentaje = vc !== 0 ? (er / vc) * 100 : 0
+        const eePorcentaje = vc !== 0 ? (ee / vc) * 100 : 0
+
+        const zona = zonasMap.get(row.zona_id)
+        if (!zona) return
+
+        zona.estaciones.push({
+          estacion_id: row.estacion_id,
+          estacion_nombre: row.estacion_nombre,
+          iib: Math.round(iibPrimerDia * 10000) / 10000,
+          c: Math.round(comprasTotal * 10000) / 10000,
+          lts: Math.round(ltsTotal * 10000) / 10000,
+          it: Math.round(it * 10000) / 10000,
+          iffb: Math.round(iffbUltimoDia * 10000) / 10000,
+          ee: Math.round(ee * 10000) / 10000,
+          d: Math.round(d * 10000) / 10000,
+          er: Math.round(er * 10000) / 10000,
+          vc: Math.round(vc * 10000) / 10000,
+          er_porcentaje: Math.round(erPorcentaje * 10000) / 10000,
+          ee_porcentaje: Math.round(eePorcentaje * 10000) / 10000,
+        })
+      })
+
+      res.json({
+        periodo: { mes, anio },
+        producto,
+        zonas: Array.from(zonasMap.values()),
+      })
+    } catch (error) {
+      console.error('Error al obtener reporte R general:', error)
+      res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async getReporteLiquidaciones(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'No autenticado' })
+      }
+
+      const mes = parseInt(req.query.mes as string, 10)
+      const anio = parseInt(req.query.anio as string, 10)
+
+      if (!mes || mes < 1 || mes > 12) {
+        return res.status(400).json({ message: 'El mes es requerido y debe estar entre 1 y 12' })
+      }
+
+      if (!anio || anio < 2000 || anio > 2100) {
+        return res.status(400).json({ message: 'El año es requerido y debe ser válido' })
+      }
+
+      const zonasResult = await pool.query(
+        `SELECT
+          z.id AS zona_id,
+          z.nombre AS zona_nombre,
+          COALESCE(z.orden_reporte, 99) AS zona_orden,
+          lm.id AS liquidacion_id,
+          COALESCE(lm.merma_generada, 0) AS merma_generada,
+          COALESCE(lm.entregas_realizadas, 0) AS entregas_realizadas,
+          COALESCE(lm.gastos_realizados, 0) AS gastos_realizados,
+          COALESCE(lm.saldo_inicial, 0) AS saldo_inicial,
+          COALESCE(lm.saldo_final, 0) AS saldo_final,
+          COALESCE(lm.diferencia, 0) AS diferencia,
+          lm.fecha_cierre,
+          lm.observaciones
+         FROM liquidaciones_mensuales lm
+         INNER JOIN zonas z ON z.id = lm.zona_id
+         WHERE lm.estacion_id IS NULL
+           AND lm.estado = 'cerrado'
+           AND lm.anio = $1
+           AND lm.mes = $2
+         ORDER BY COALESCE(z.orden_reporte, 99), z.nombre`,
+        [anio, mes]
+      )
+
+      const zonas = []
+      let totalMerma = 0
+      let totalEntregas = 0
+      let totalGastos = 0
+      let totalSaldoInicial = 0
+      let totalSaldoFinal = 0
+      let totalDiferencia = 0
+
+      for (const zona of zonasResult.rows) {
+        const estacionesResult = await pool.query(
+          `SELECT
+            e.id AS estacion_id,
+            e.nombre AS estacion_nombre,
+            e.identificador_externo,
+            COALESCE(lm.merma_generada, 0) AS merma_generada,
+            COALESCE(lm.entregas_realizadas, 0) AS entregas_realizadas,
+            COALESCE(lm.gastos_realizados, 0) AS gastos_realizados,
+            COALESCE(lm.saldo_inicial, 0) AS saldo_inicial,
+            COALESCE(lm.saldo_final, 0) AS saldo_final,
+            COALESCE(lm.diferencia, 0) AS diferencia,
+            lm.fecha_cierre
+           FROM liquidaciones_mensuales lm
+           INNER JOIN estaciones e ON e.id = lm.estacion_id
+           WHERE e.zona_id = $1
+             AND lm.anio = $2
+             AND lm.mes = $3
+             AND lm.estado = 'cerrado'
+           ORDER BY e.nombre`,
+          [zona.zona_id, anio, mes]
+        )
+
+        const estaciones = estacionesResult.rows.map((est) => ({
+          estacion_id: est.estacion_id,
+          estacion_nombre: est.estacion_nombre,
+          identificador_externo: est.identificador_externo,
+          merma_generada: Math.round(parseFloat(est.merma_generada || '0') * 10000) / 10000,
+          entregas_realizadas: Math.round(parseFloat(est.entregas_realizadas || '0') * 10000) / 10000,
+          gastos_realizados: Math.round(parseFloat(est.gastos_realizados || '0') * 10000) / 10000,
+          saldo_inicial: Math.round(parseFloat(est.saldo_inicial || '0') * 10000) / 10000,
+          saldo_final: Math.round(parseFloat(est.saldo_final || '0') * 10000) / 10000,
+          diferencia: Math.round(parseFloat(est.diferencia || '0') * 10000) / 10000,
+          fecha_cierre: est.fecha_cierre,
+        }))
+
+        const mermaZona = Math.round(parseFloat(zona.merma_generada || '0') * 10000) / 10000
+        const entregasZona = Math.round(parseFloat(zona.entregas_realizadas || '0') * 10000) / 10000
+        const gastosZona = Math.round(parseFloat(zona.gastos_realizados || '0') * 10000) / 10000
+        const saldoInicialZona = Math.round(parseFloat(zona.saldo_inicial || '0') * 10000) / 10000
+        const saldoFinalZona = Math.round(parseFloat(zona.saldo_final || '0') * 10000) / 10000
+        const diferenciaZona = Math.round(parseFloat(zona.diferencia || '0') * 10000) / 10000
+
+        totalMerma += mermaZona
+        totalEntregas += entregasZona
+        totalGastos += gastosZona
+        totalSaldoInicial += saldoInicialZona
+        totalSaldoFinal += saldoFinalZona
+        totalDiferencia += diferenciaZona
+
+        zonas.push({
+          zona_id: zona.zona_id,
+          zona_nombre: zona.zona_nombre,
+          zona_orden: parseInt(zona.zona_orden, 10),
+          liquidacion_id: zona.liquidacion_id,
+          merma_generada: mermaZona,
+          entregas_realizadas: entregasZona,
+          gastos_realizados: gastosZona,
+          saldo_inicial: saldoInicialZona,
+          saldo_final: saldoFinalZona,
+          diferencia: diferenciaZona,
+          fecha_cierre: zona.fecha_cierre,
+          observaciones: zona.observaciones,
+          estaciones,
+          total_estaciones: estaciones.length,
+        })
+      }
+
+      res.json({
+        periodo: { mes, anio },
+        resumen: {
+          total_zonas: zonas.length,
+          total_merma: Math.round(totalMerma * 10000) / 10000,
+          total_entregas: Math.round(totalEntregas * 10000) / 10000,
+          total_gastos: Math.round(totalGastos * 10000) / 10000,
+          total_saldo_inicial: Math.round(totalSaldoInicial * 10000) / 10000,
+          total_saldo_final: Math.round(totalSaldoFinal * 10000) / 10000,
+          total_diferencia: Math.round(totalDiferencia * 10000) / 10000,
+        },
+        zonas,
+      })
+    } catch (error) {
+      console.error('Error al obtener reporte de liquidaciones:', error)
+      res.status(500).json({ message: 'Error interno del servidor' })
+    }
+  },
+
+  async getReporteConciliacionMensual(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'No autenticado' })
+      }
+
+      const mes = parseInt(req.query.mes as string, 10)
+      const anio = parseInt(req.query.anio as string, 10)
+
+      if (!mes || mes < 1 || mes > 12) {
+        return res.status(400).json({ message: 'El mes es requerido y debe estar entre 1 y 12' })
+      }
+
+      if (!anio || anio < 2000 || anio > 2100) {
+        return res.status(400).json({ message: 'El año es requerido y debe ser válido' })
+      }
+
+      const productosResult = await pool.query(
+        `SELECT id, tipo_producto, nombre_display, orden
+         FROM productos_catalogo
+         WHERE activo = true
+         ORDER BY orden ASC, nombre_display ASC`
+      )
+
+      const productos = productosResult.rows.map((p) => ({
+        id: p.id,
+        tipo_producto: p.tipo_producto,
+        nombre_display: p.nombre_display,
+      }))
+
+      const zonasResult = await pool.query(
+        `SELECT DISTINCT z.id as zona_id, z.nombre as zona_nombre, COALESCE(z.orden_reporte, 99) as zona_orden
+         FROM zonas z
+         INNER JOIN estaciones e ON e.zona_id = z.id AND e.activa = true
+         WHERE z.activa = true
+         ORDER BY COALESCE(z.orden_reporte, 99), z.nombre`
+      )
+
+      const zonas = []
+
+      for (const zona of zonasResult.rows) {
+        const estacionesResult = await pool.query(
+          `SELECT
+            e.id as estacion_id,
+            e.nombre as estacion_nombre,
+            e.identificador_externo,
+            rm.premium_merma_volumen_total,
+            rm.premium_merma_importe_total,
+            rm.magna_merma_volumen_total,
+            rm.magna_merma_importe_total,
+            rm.diesel_merma_volumen_total,
+            rm.diesel_merma_importe_total
+           FROM estaciones e
+           LEFT JOIN LATERAL (
+             SELECT
+               COALESCE(SUM(CASE WHEN LOWER(pc.tipo_producto) = 'premium' THEN rp.merma_volumen ELSE 0 END), 0) AS premium_merma_volumen_total,
+               COALESCE(SUM(CASE WHEN LOWER(pc.tipo_producto) = 'premium' THEN rp.merma_importe ELSE 0 END), 0) AS premium_merma_importe_total,
+               COALESCE(SUM(CASE WHEN LOWER(pc.tipo_producto) = 'magna' THEN rp.merma_volumen ELSE 0 END), 0) AS magna_merma_volumen_total,
+               COALESCE(SUM(CASE WHEN LOWER(pc.tipo_producto) = 'magna' THEN rp.merma_importe ELSE 0 END), 0) AS magna_merma_importe_total,
+               COALESCE(SUM(CASE WHEN LOWER(pc.tipo_producto) = 'diesel' THEN rp.merma_volumen ELSE 0 END), 0) AS diesel_merma_volumen_total,
+               COALESCE(SUM(CASE WHEN LOWER(pc.tipo_producto) = 'diesel' THEN rp.merma_importe ELSE 0 END), 0) AS diesel_merma_importe_total
+             FROM reportes r
+             INNER JOIN reporte_productos rp ON rp.reporte_id = r.id
+             INNER JOIN productos_catalogo pc ON pc.id = rp.producto_id
+             WHERE r.estacion_id = e.id
+               AND EXTRACT(YEAR FROM r.fecha) = $2
+               AND EXTRACT(MONTH FROM r.fecha) = $3
+               AND r.estado = 'Aprobado'
+           ) rm ON true
+           WHERE e.zona_id = $1
+             AND e.activa = true
+           ORDER BY e.nombre`,
+          [zona.zona_id, anio, mes]
+        )
+
+        const estaciones = []
+        let totalMermaZona = 0
+        let totalEntregasZona = 0
+
+        for (const est of estacionesResult.rows) {
+          const premiumVolumen = parseFloat(est.premium_merma_volumen_total || '0')
+          const premiumImporte = parseFloat(est.premium_merma_importe_total || '0')
+          const premiumPrecio = premiumVolumen > 0 ? premiumImporte / premiumVolumen : 0
+
+          const magnaVolumen = parseFloat(est.magna_merma_volumen_total || '0')
+          const magnaImporte = parseFloat(est.magna_merma_importe_total || '0')
+          const magnaPrecio = magnaVolumen > 0 ? magnaImporte / magnaVolumen : 0
+
+          const dieselVolumen = parseFloat(est.diesel_merma_volumen_total || '0')
+          const dieselImporte = parseFloat(est.diesel_merma_importe_total || '0')
+          const dieselPrecio = dieselVolumen > 0 ? dieselImporte / dieselVolumen : 0
+
+          const totalMermaEstacion = premiumImporte + magnaImporte + dieselImporte
+          totalMermaZona += totalMermaEstacion
+
+          const entregasYGastosResult = await pool.query(
+            `SELECT
+              COALESCE((
+                SELECT SUM(e.monto)
+                FROM entregas e
+                WHERE e.estacion_id = $1
+                  AND e.zona_id = $2
+                  AND e.tipo_entrega = 'estacion_zona'
+                  AND COALESCE(e.estado_entrega, 'confirmada') = 'confirmada'
+                  AND EXTRACT(YEAR FROM e.fecha) = $3
+                  AND EXTRACT(MONTH FROM e.fecha) = $4
+              ), 0) AS total_entregado,
+              COALESCE((
+                SELECT SUM(g.monto)
+                FROM gastos g
+                WHERE g.estacion_id = $1
+                  AND g.tipo_gasto = 'estacion'
+                  AND EXTRACT(YEAR FROM g.fecha) = $3
+                  AND EXTRACT(MONTH FROM g.fecha) = $4
+              ), 0) AS total_gastado`,
+            [est.estacion_id, zona.zona_id, anio, mes]
+          )
+
+          const totalEntregado = parseFloat(entregasYGastosResult.rows[0]?.total_entregado || '0')
+          const totalGastado = parseFloat(entregasYGastosResult.rows[0]?.total_gastado || '0')
+          const totalEntregas = totalEntregado + totalGastado
+          const diferencia = totalEntregas - totalMermaEstacion
+          totalEntregasZona += totalEntregas
+
+          estaciones.push({
+            estacion_id: est.estacion_id,
+            identificador_externo: est.identificador_externo,
+            nombre: est.estacion_nombre,
+            productos: {
+              premium: {
+                merma_volumen: Math.round(premiumVolumen * 10000) / 10000,
+                precio: Math.round(premiumPrecio * 10000) / 10000,
+                merma_monto: Math.round(premiumImporte * 10000) / 10000,
+              },
+              magna: {
+                merma_volumen: Math.round(magnaVolumen * 10000) / 10000,
+                precio: Math.round(magnaPrecio * 10000) / 10000,
+                merma_monto: Math.round(magnaImporte * 10000) / 10000,
+              },
+              diesel: {
+                merma_volumen: Math.round(dieselVolumen * 10000) / 10000,
+                precio: Math.round(dieselPrecio * 10000) / 10000,
+                merma_monto: Math.round(dieselImporte * 10000) / 10000,
+              },
+            },
+            total_merma: Math.round(totalMermaEstacion * 10000) / 10000,
+            total_entregas: Math.round(totalEntregas * 10000) / 10000,
+            diferencia: Math.round(diferencia * 10000) / 10000,
+          })
+        }
+
+        const diferenciaZona = totalEntregasZona - totalMermaZona
+
+        zonas.push({
+          zona_id: zona.zona_id,
+          zona_nombre: zona.zona_nombre,
+          zona_orden: parseInt(zona.zona_orden, 10),
+          total_merma_zona: Math.round(totalMermaZona * 10000) / 10000,
+          total_entregas_zona: Math.round(totalEntregasZona * 10000) / 10000,
+          diferencia_zona: Math.round(diferenciaZona * 10000) / 10000,
+          total_estaciones: estaciones.length,
+          estaciones,
+        })
+      }
+
+      res.json({
+        periodo: { mes, anio },
+        productos,
+        total_zonas: zonas.length,
+        zonas,
+      })
+    } catch (error) {
+      console.error('Error al obtener conciliación mensual:', error)
       res.status(500).json({ message: 'Error interno del servidor' })
     }
   },

@@ -8,7 +8,9 @@ import { Link } from 'react-router-dom';
 import DynamicHeader from '../components/DynamicHeader';
 import ModalRegistrarGasto from '../components/ModalRegistrarGasto';
 import ModalRegistrarEntrega from '../components/ModalRegistrarEntrega';
+import ModalRegistrarEntregaZona from '../components/ModalRegistrarEntregaZona';
 import ModalLiquidarPeriodo from '../components/ModalLiquidarPeriodo';
+import ModalFirmarEntregas from '../components/ModalFirmarEntregas';
 import { useEjerciciosActivos } from '../hooks/useEjerciciosActivos';
 
 export default function DashboardFinanciero() {
@@ -25,7 +27,9 @@ export default function DashboardFinanciero() {
 
   const [showModalGasto, setShowModalGasto] = useState(false);
   const [showModalEntrega, setShowModalEntrega] = useState(false);
+  const [showModalEntregaZona, setShowModalEntregaZona] = useState(false);
   const [showModalLiquidar, setShowModalLiquidar] = useState(false);
+  const [showModalFirmarEntregas, setShowModalFirmarEntregas] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['dashboard-financiero', periodo.mes, periodo.anio],
@@ -86,7 +90,7 @@ export default function DashboardFinanciero() {
 
   const formatNumber = (value: string | number): string => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    return num.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+    return num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   const getMesNombre = (): string[] => {
@@ -273,7 +277,7 @@ export default function DashboardFinanciero() {
                       Periodo Operativo Cerrado
                     </h3>
                     <p className="text-sm text-blue-800 dark:text-blue-400">
-                      Este periodo operativo ya ha sido cerrado. No se pueden registrar nuevas entregas ni gastos de zona.
+                      Este periodo operativo ya ha sido cerrado. Se bloquea la captura de reportes operativos, pero los movimientos financieros siguen permitidos mientras el periodo contable esté abierto.
                       {estadoPeriodoOperativo.cerrado_por && (
                         <span className="block mt-1">
                           Cerrado por: <strong>{estadoPeriodoOperativo.cerrado_por}</strong>
@@ -323,40 +327,47 @@ export default function DashboardFinanciero() {
         <div className="mb-6 flex justify-end gap-3">
           {/* Botones para Gerente de Estación */}
           {data.tipo === 'gerente_estacion' && estacionesParaGasto.length > 0 && (
-            <button 
-              onClick={() => setShowModalGasto(true)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm hover:shadow-md"
-            >
-              <span className="material-symbols-outlined mr-2 text-xl">receipt_long</span>
-              Registrar Gasto
-            </button>
-          )}
-
-          {/* Botones para Gerente de Zona */}
-          {data.tipo === 'gerente_zona' && estacionesParaEntrega.length > 0 && (
             <>
               <button 
                 onClick={() => setShowModalEntrega(true)}
-                disabled={estadoPeriodoOperativo?.esta_cerrado}
-                className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md ${
-                  estadoPeriodoOperativo?.esta_cerrado
-                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-                title={estadoPeriodoOperativo?.esta_cerrado ? 'Periodo operativo cerrado' : 'Registrar entregas de estaciones'}
+                className="inline-flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors shadow-sm hover:shadow-md"
               >
                 <span className="material-symbols-outlined mr-2 text-xl">payments</span>
                 Registrar Entrega
               </button>
               <button 
                 onClick={() => setShowModalGasto(true)}
-                disabled={estadoPeriodoOperativo?.esta_cerrado}
-                className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md ${
-                  estadoPeriodoOperativo?.esta_cerrado
-                    ? 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-                title={estadoPeriodoOperativo?.esta_cerrado ? 'Periodo operativo cerrado' : 'Registrar gastos de la zona'}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm hover:shadow-md"
+              >
+                <span className="material-symbols-outlined mr-2 text-xl">receipt_long</span>
+                Registrar Gasto
+              </button>
+            </>
+          )}
+
+          {/* Botones para Gerente de Zona */}
+          {data.tipo === 'gerente_zona' && estacionesParaEntrega.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowModalEntregaZona(true)}
+                className="inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md bg-emerald-600 hover:bg-emerald-700 text-white"
+                title="Registrar entrega de zona a dirección"
+              >
+                <span className="material-symbols-outlined mr-2 text-xl">north_east</span>
+                Entrega a Dirección
+              </button>
+              <button 
+                onClick={() => setShowModalFirmarEntregas(true)}
+                className="inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md bg-green-600 hover:bg-green-700 text-white"
+                title="Firmar entregas pendientes de estaciones"
+              >
+                <span className="material-symbols-outlined mr-2 text-xl">verified</span>
+                Firmar Entregas
+              </button>
+              <button 
+                onClick={() => setShowModalGasto(true)}
+                className="inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md bg-blue-600 hover:bg-blue-700 text-white"
+                title="Registrar gastos de la zona"
               >
                 <span className="material-symbols-outlined mr-2 text-xl">receipt_long</span>
                 Registrar Gasto Zona
@@ -377,6 +388,18 @@ export default function DashboardFinanciero() {
                 Liquidar Período
               </button>
             </>
+          )}
+
+          {(data.tipo === 'director' || data.tipo === 'admin') &&
+            (user?.role === Role.Direccion || user?.role === Role.DirectorOperaciones) && (
+            <button
+              onClick={() => setShowModalFirmarEntregas(true)}
+              className="inline-flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm hover:shadow-md bg-green-600 hover:bg-green-700 text-white"
+              title="Firmar entregas de zona a dirección"
+            >
+              <span className="material-symbols-outlined mr-2 text-xl">verified</span>
+              Firmar Entregas
+            </button>
           )}
         </div>
 
@@ -407,13 +430,40 @@ export default function DashboardFinanciero() {
       )}
 
       {/* Modal Registrar Entrega */}
-      {showModalEntrega && estacionesParaEntrega.length > 0 && zonaId && (
+      {showModalEntrega && data?.tipo === 'gerente_estacion' && estacionesParaGasto.length > 0 && (
         <ModalRegistrarEntrega
-          estaciones={estacionesParaEntrega}
-          zona_id={zonaId}
-          zona_nombre={zonaNombre}
+          estaciones={estacionesParaGasto.map((est: any) => ({
+            estacion_id: est.id,
+            estacion_nombre: est.nombre,
+            merma_generada: 0,
+            entregas_realizadas: 0,
+            gastos_realizados: 0,
+            saldo_resguardo: 0,
+          }))}
           onClose={() => setShowModalEntrega(false)}
           periodo={periodo}
+        />
+      )}
+
+      {/* Modal Firmar Entregas */}
+      {showModalFirmarEntregas && (
+        data?.tipo === 'gerente_zona' ||
+        ((data?.tipo === 'director' || data?.tipo === 'admin') &&
+          (user?.role === Role.Direccion || user?.role === Role.DirectorOperaciones))
+      ) && (
+        <ModalFirmarEntregas
+          mes={periodo.mes}
+          anio={periodo.anio}
+          onClose={() => setShowModalFirmarEntregas(false)}
+        />
+      )}
+
+      {/* Modal Registrar Entrega Zona -> Dirección */}
+      {showModalEntregaZona && data?.tipo === 'gerente_zona' && zonaId && (
+        <ModalRegistrarEntregaZona
+          zona={{ id: zonaId, nombre: zonaNombre }}
+          periodo={periodo}
+          onClose={() => setShowModalEntregaZona(false)}
         />
       )}
 
@@ -437,7 +487,7 @@ export default function DashboardFinanciero() {
 interface DashboardGerenteEstacionProps {
   data: any;
   formatNumber: (value: string | number) => string;
-  getEstadoSaldo: (saldo: number, merma: number) => any;
+  getEstadoSaldo: (saldo: number, merma: number, entregas?: number) => any;
 }
 
 function DashboardGerenteEstacion({ data, formatNumber, getEstadoSaldo }: DashboardGerenteEstacionProps) {
@@ -506,11 +556,17 @@ function DashboardGerenteEstacion({ data, formatNumber, getEstadoSaldo }: Dashbo
             </thead>
             <tbody className="divide-y divide-[#e6e8eb] dark:divide-slate-700">
               {data.estaciones.map((estacion: any) => {
-                const estado = getEstadoSaldo(
-                  parseFloat(estacion.saldo_resguardo.toString()),
-                  parseFloat(estacion.merma_generada.toString()),
-                  parseFloat(estacion.entregas_realizadas.toString() || '0')
-                );
+                const estado = data.periodo_contable_liquidado
+                  ? {
+                      color: 'text-green-600 dark:text-green-400',
+                      bg: 'bg-green-50 dark:bg-green-900/20',
+                      label: 'Liquidado',
+                    }
+                  : getEstadoSaldo(
+                      parseFloat(estacion.saldo_resguardo.toString()),
+                      parseFloat(estacion.merma_generada.toString()),
+                      parseFloat(estacion.entregas_realizadas.toString() || '0')
+                    );
                 return (
                   <tr key={estacion.estacion_id} className="hover:bg-gray-50 dark:hover:bg-[#0d1b2a]">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#111418] dark:text-white">
@@ -547,7 +603,7 @@ function DashboardGerenteEstacion({ data, formatNumber, getEstadoSaldo }: Dashbo
 interface DashboardGerenteZonaProps {
   data: any;
   formatNumber: (value: string | number) => string;
-  getEstadoSaldo: (saldo: number, merma: number) => any;
+  getEstadoSaldo: (saldo: number, merma: number, entregas?: number) => any;
 }
 
 function DashboardGerenteZona({ data, formatNumber, getEstadoSaldo }: DashboardGerenteZonaProps) {
@@ -674,11 +730,17 @@ function DashboardGerenteZona({ data, formatNumber, getEstadoSaldo }: DashboardG
             </thead>
             <tbody className="divide-y divide-[#e6e8eb] dark:divide-slate-700">
               {data.estaciones.map((estacion: any) => {
-                const estado = getEstadoSaldo(
-                  parseFloat(estacion.saldo_resguardo.toString()),
-                  parseFloat(estacion.merma_generada.toString()),
-                  parseFloat(estacion.entregas_realizadas.toString() || '0')
-                );
+                const estado = data.periodo_contable_liquidado
+                  ? {
+                      color: 'text-green-600 dark:text-green-400',
+                      bg: 'bg-green-50 dark:bg-green-900/20',
+                      label: 'Liquidado'
+                    }
+                  : getEstadoSaldo(
+                      parseFloat(estacion.saldo_resguardo.toString()),
+                      parseFloat(estacion.merma_generada.toString()),
+                      parseFloat(estacion.entregas_realizadas.toString() || '0')
+                    );
                 return (
                   <tr key={estacion.estacion_id} className="hover:bg-gray-50 dark:hover:bg-[#0d1b2a]">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#111418] dark:text-white">
@@ -731,14 +793,14 @@ function DashboardDirector({ data, formatNumber }: DashboardDirectorProps) {
         </div>
 
         <div className="bg-white dark:bg-[#1a2632] rounded-xl border border-[#e6e8eb] dark:border-slate-700 p-6">
-          <div className="text-sm text-[#60758a] dark:text-gray-400 mb-2">Entregas Recibidas</div>
+          <div className="text-sm text-[#60758a] dark:text-gray-400 mb-2">Merma</div>
           <div className="text-2xl font-bold text-[#111418] dark:text-white">
             ${formatNumber(data.totales.entregas_recibidas_total)}
           </div>
         </div>
 
         <div className="bg-white dark:bg-[#1a2632] rounded-xl border border-[#e6e8eb] dark:border-slate-700 p-6">
-          <div className="text-sm text-[#60758a] dark:text-gray-400 mb-2">Entregas a Dirección</div>
+          <div className="text-sm text-[#60758a] dark:text-gray-400 mb-2">Resguardo</div>
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">
             ${formatNumber(data.totales.entregas_direccion_total)}
           </div>
@@ -752,7 +814,7 @@ function DashboardDirector({ data, formatNumber }: DashboardDirectorProps) {
         </div>
 
         <div className="bg-white dark:bg-[#1a2632] rounded-xl border border-[#e6e8eb] dark:border-slate-700 p-6">
-          <div className="text-sm text-[#60758a] dark:text-gray-400 mb-2">Resguardo Total</div>
+          <div className="text-sm text-[#60758a] dark:text-gray-400 mb-2">Resguardo Zonas</div>
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             ${formatNumber(data.totales.resguardo_total)}
           </div>
